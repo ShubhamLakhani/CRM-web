@@ -15,13 +15,6 @@ interface UIState {
   toggleSidebar: () => void;
 }
 
-interface AuthState {
-  user: User | null;
-  token: string | null;
-  setAuth: (user: User, token: string) => void;
-  logout: () => void;
-}
-
 interface CRMState {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -29,7 +22,7 @@ interface CRMState {
   setStatusFilter: (status: string) => void;
 }
 
-type StoreState = UIState & AuthState & CRMState;
+type StoreState = UIState & CRMState;
 
 export const useCRMStore = create<StoreState>((set) => ({
   // UI State
@@ -56,24 +49,6 @@ export const useCRMStore = create<StoreState>((set) => ({
     set({ theme });
   },
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-
-  // Auth State
-  user: null,
-  token: null,
-  setAuth: (user, token) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('apex-token', token);
-      localStorage.setItem('apex-user', JSON.stringify(user));
-    }
-    set({ user, token });
-  },
-  logout: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('apex-token');
-      localStorage.removeItem('apex-user');
-    }
-    set({ user: null, token: null });
-  },
 
   // CRM state
   searchQuery: '',

@@ -30,37 +30,61 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore session from localStorage/API on mount
+  // Restore session from API on mount/refresh
   useEffect(() => {
+    let active = true;
+
     async function restoreSession() {
-      const persistedToken = localStorage.getItem('apex-session-token');
+      // If we already have an in-memory access token, we don't need to restore/refresh again
+      if (accessToken) {
+        setIsLoading(false);
+        return;
+      }
+
       const persistedUser = localStorage.getItem('apex-user');
 
-      if (persistedToken && persistedUser) {
+      if (persistedUser) {
         try {
-          // Store token in Axios memory client first
-          setMemoryToken(persistedToken);
-          setAccessToken(persistedToken);
-          
-          // Verify session integrity with backend
-          const userData = await authService.me();
-          setUser(userData);
-          localStorage.setItem('apex-user', JSON.stringify(userData));
+          // Pre-populate user to prevent UI flicker
+          try {
+            setUser(JSON.parse(persistedUser));
+          } catch (e) {}
+
+          // Call the cookie-based refresh to obtain access token
+          const data = await authService.refresh();
+          if (!active) return;
+
+          setMemoryToken(data.accessToken);
+          setAccessToken(data.accessToken);
+          setUser(data.user);
+          localStorage.setItem('apex-user', JSON.stringify(data.user));
+
+          // If they land on login page but have a valid session, go to dashboard
+          if (pathname.startsWith('/login')) {
+            router.replace('/dashboard');
+          }
         } catch (error) {
           console.error('Session restoration failed:', error);
-          // Token is cleared automatically by response interceptor on 401
+          if (!active) return;
           logout();
         }
       } else {
-        // No session token, redirect if on protected route
+        // No session user, redirect if on protected route
         if (!pathname.startsWith('/login')) {
           router.replace('/login');
         }
       }
-      setIsLoading(false);
+      if (active) {
+        setIsLoading(false);
+      }
     }
+
     restoreSession();
-  }, [pathname]);
+
+    return () => {
+      active = false;
+    };
+  }, [pathname, accessToken]);
 
   const login = async (credentials: any) => {
     setIsLoading(true);
@@ -69,14 +93,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       setMemoryToken(data.accessToken);
       setAccessToken(data.accessToken);
       setUser(data.user);
-      localStorage.setItem('apex-session-token', data.accessToken);
-      localStorage.setItem('apex-refresh-token', data.refreshToken);
       localStorage.setItem('apex-user', JSON.stringify(data.user));
       router.replace('/dashboard');
     } catch (error) {
       setMemoryToken(null);
       setAccessToken(null);
       setUser(null);
+      localStorage.removeItem('apex-user');
       throw error;
     } finally {
       setIsLoading(false);
@@ -90,14 +113,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       setMemoryToken(data.accessToken);
       setAccessToken(data.accessToken);
       setUser(data.user);
-      localStorage.setItem('apex-session-token', data.accessToken);
-      localStorage.setItem('apex-refresh-token', data.refreshToken);
       localStorage.setItem('apex-user', JSON.stringify(data.user));
       router.replace('/dashboard');
     } catch (error) {
       setMemoryToken(null);
       setAccessToken(null);
       setUser(null);
+      localStorage.removeItem('apex-user');
       throw error;
     } finally {
       setIsLoading(false);
@@ -105,17 +127,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   };
 
   const logout = () => {
-    const refreshToken = localStorage.getItem('apex-refresh-token');
-    if (refreshToken) {
-      authService.logout(refreshToken).catch((err) => {
-        console.error('Failed backend session logout:', err);
-      });
-    }
+    authService.logout().catch((err) => {
+      console.error('Failed backend session logout:', err);
+    });
     setMemoryToken(null);
     setAccessToken(null);
     setUser(null);
-    localStorage.removeItem('apex-session-token');
-    localStorage.removeItem('apex-refresh-token');
     localStorage.removeItem('apex-user');
     router.replace('/login');
   };

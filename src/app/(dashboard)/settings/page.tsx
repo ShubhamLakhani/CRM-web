@@ -2,10 +2,12 @@
 
 import React from 'react';
 import { useCRMStore } from '../../../store/crmStore';
+import { useAuth } from '../../../providers/AuthProvider';
 import { Sun, Moon, Shield, Settings, Server, Database, Globe, User } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { theme, toggleTheme, user } = useCRMStore();
+  const { theme, toggleTheme } = useCRMStore();
+  const { user } = useAuth();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">

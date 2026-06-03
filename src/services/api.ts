@@ -4,6 +4,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -48,12 +49,9 @@ apiClient.interceptors.response.use(
     // Trigger token refresh on 401 Unauthorized errors
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (typeof window !== 'undefined') {
-        const persistedToken = localStorage.getItem('apex-session-token');
-        const persistedRefreshToken = localStorage.getItem('apex-refresh-token');
-        if (!persistedToken || !persistedRefreshToken) {
+        const hasUser = localStorage.getItem('apex-user');
+        if (!hasUser) {
           // If we are not already on the login page and session is completely gone, redirect
-          localStorage.removeItem('apex-session-token');
-          localStorage.removeItem('apex-refresh-token');
           localStorage.removeItem('apex-user');
           if (!window.location.pathname.startsWith('/login')) {
             window.location.href = '/login';
@@ -77,12 +75,10 @@ apiClient.interceptors.response.use(
 
         try {
           // Perform refreshing via standard axios instance to bypass interceptors
-          const res = await axios.post(`${API_URL}/auth/refresh`, { refreshToken: persistedRefreshToken });
-          const { accessToken, refreshToken } = res.data;
+          const res = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
+          const { accessToken } = res.data;
 
           setMemoryToken(accessToken);
-          localStorage.setItem('apex-session-token', accessToken);
-          localStorage.setItem('apex-refresh-token', refreshToken);
 
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           processQueue(null, accessToken);
@@ -90,9 +86,8 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         } catch (refreshError) {
           processQueue(refreshError, null);
-          localStorage.removeItem('apex-session-token');
-          localStorage.removeItem('apex-refresh-token');
           localStorage.removeItem('apex-user');
+          setMemoryToken(null);
           if (!window.location.pathname.startsWith('/login')) {
             window.location.href = '/login';
           }
@@ -120,12 +115,12 @@ export const authService = {
     const res = await apiClient.get('/auth/me');
     return res.data;
   },
-  refresh: async (refreshToken: string) => {
-    const res = await apiClient.post('/auth/refresh', { refreshToken });
+  refresh: async () => {
+    const res = await apiClient.post('/auth/refresh');
     return res.data;
   },
-  logout: async (refreshToken: string) => {
-    const res = await apiClient.post('/auth/logout', { refreshToken });
+  logout: async () => {
+    const res = await apiClient.post('/auth/logout');
     return res.data;
   },
   logoutAll: async () => {

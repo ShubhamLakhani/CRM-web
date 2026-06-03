@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCRMStore } from '../store/crmStore';
+import { useAuth } from '../providers/AuthProvider';
 import { Sun, Moon, LogOut, User, Menu, ChevronRight, Search, Settings, HelpCircle, Bell } from 'lucide-react';
 
 interface HeaderProps {
@@ -13,7 +14,8 @@ interface HeaderProps {
 export default function Header({ onMenuClick, onSearchClick }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { theme, toggleTheme, user, logout } = useCRMStore();
+  const { theme, toggleTheme } = useCRMStore();
+  const { user, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
   // Generate dynamic breadcrumbs from path
