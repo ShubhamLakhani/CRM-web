@@ -21,6 +21,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dealsService, contactsService } from '@/services/api';
 import { useFeatures } from '@/hooks/useFeatures';
 import { usePermissions } from '@/hooks/usePermissions';
+import ActivityTimeline from '@/components/ActivityTimeline';
 
 interface DealActivity {
   id: string;
@@ -787,7 +788,7 @@ export default function DealsPage() {
 
                   {/* Deal activities timelines */}
                   <div className="space-y-4">
-                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Internal Log History</h3>
+                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Activity Timeline</h3>
 
                     {/* Add note inside drawer */}
                     {canUpdate && (
@@ -810,38 +811,8 @@ export default function DealsPage() {
                     )}
 
                     {/* Timeline Feed list */}
-                    <div className="relative border-l border-border/80 pl-6 ml-3.5 space-y-4">
-                      {selectedDeal.activities && selectedDeal.activities.length > 0 ? (
-                        selectedDeal.activities.map((act) => (
-                          <div key={act.id} className="relative group">
-                            <div className="absolute -left-8 top-0.5 h-6.5 w-6.5 rounded-lg bg-card border border-border flex items-center justify-center shadow-sm z-10">
-                              {act.type === 'SYSTEM_UPDATE' ? (
-                                <Sparkles className="h-3 w-3 text-violet-400 animate-pulse" />
-                              ) : (
-                                <MessageSquare className="h-3 w-3 text-indigo-400" />
-                              )}
-                            </div>
-
-                            <div className="rounded-xl border border-border bg-card/60 p-3 text-xs shadow-sm">
-                              <span className="text-[10px] font-extrabold text-muted-foreground">
-                                {new Date(act.createdAt).toLocaleDateString(undefined, {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </span>
-                              <p className="mt-1 text-foreground font-semibold leading-relaxed">
-                                {act.description}
-                              </p>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center text-xs text-muted-foreground/60 py-6">
-                          No logs registered under this opportunity yet.
-                        </div>
-                      )}
+                    <div className="mt-4">
+                      <ActivityTimeline entityType="deal" entityId={selectedDeal.id} />
                     </div>
                   </div>
                 </>

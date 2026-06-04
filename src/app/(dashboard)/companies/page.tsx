@@ -18,6 +18,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { companiesService } from '@/services/api';
 import { usePermissions } from '@/hooks/usePermissions';
+import ActivityTimeline from '@/components/ActivityTimeline';
 
 interface Company {
   id: string;
@@ -36,6 +37,10 @@ export default function CompaniesPage() {
   const canUpdate = hasPermission('companies.update');
   const canDelete = hasPermission('companies.delete');
   const [mounted, setMounted] = useState(false);
+
+  // Drawer States
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Filter and Search States
   const [search, setSearch] = useState('');
@@ -296,6 +301,16 @@ export default function CompaniesPage() {
     setEditFormError(null);
   };
 
+  const handleOpenDrawer = (company: Company) => {
+    setSelectedCompany(company);
+    setDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setSelectedCompany(null);
+    setDrawerOpen(false);
+  };
+
   // Loading indicator on mount or fetch
   if (!mounted || companiesQuery.isLoading) {
     return (
@@ -407,7 +422,12 @@ export default function CompaniesPage() {
                           {company.name.charAt(0)}
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-semibold text-foreground">{company.name}</span>
+                          <span
+                            onClick={() => handleOpenDrawer(company)}
+                            className="font-semibold text-foreground hover:text-indigo-400 cursor-pointer transition-colors"
+                          >
+                            {company.name}
+                          </span>
                           {company.domain && (
                             <a
                               href={`https://${company.domain}`}
@@ -657,6 +677,66 @@ export default function CompaniesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Slide-out Company Details Drawer */}
+      {drawerOpen && selectedCompany && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={handleCloseDrawer}
+          />
+          <div className="relative w-full max-w-xl bg-card border-l border-border h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="flex h-16 items-center justify-between px-6 border-b border-border bg-secondary/10">
+              <div className="flex items-center gap-2">
+                <Building className="h-5 w-5 text-indigo-500" />
+                <span className="text-sm font-bold text-foreground">Company Details</span>
+              </div>
+              <button
+                onClick={handleCloseDrawer}
+                className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Profile Card */}
+              <div className="rounded-2xl border border-border bg-muted/10 p-5 space-y-4">
+                <div className="flex items-center gap-3.5">
+                  <div className={`h-11 w-11 rounded-xl bg-gradient-to-tr ${getLogoColor(selectedCompany.id)} flex items-center justify-center text-white text-lg font-bold border border-white/10 shadow-md`}>
+                    {selectedCompany.name.charAt(0)}
+                  </div>
+                  <div className="flex flex-col">
+                    <h2 className="text-base font-bold text-foreground leading-snug">{selectedCompany.name}</h2>
+                    {selectedCompany.domain && (
+                      <span className="text-xs text-muted-foreground">{selectedCompany.domain}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/40 text-xs">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block mb-0.5">Sector</span>
+                    <span className="font-semibold text-foreground">{selectedCompany.industry || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block mb-0.5">Employee Scale</span>
+                    <span className="font-semibold text-foreground">{(selectedCompany.employees || 0).toLocaleString()} staff</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Activity Timeline Section */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Activity Timeline</h3>
+                <ActivityTimeline entityType="company" entityId={selectedCompany.id} />
+              </div>
+            </div>
           </div>
         </div>
       )}

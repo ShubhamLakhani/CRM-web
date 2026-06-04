@@ -1,167 +1,292 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Search, Plus, Phone, Mail, Calendar, MessageSquare, Sparkles, Filter, Trash2, Clock } from 'lucide-react';
-
-interface ActivityLog {
-  id: string;
-  type: 'CALL' | 'EMAIL' | 'MEETING' | 'NOTE' | 'SYSTEM_UPDATE';
-  description: string;
-  creator: {
-    name: string;
-    avatarInitials: string;
-  };
-  contactName?: string;
-  dealTitle?: string;
-  createdAt: string;
-}
+import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { activitiesService } from '@/services/api';
+import {
+  Search,
+  Sparkles,
+  Clock,
+  Plus,
+  RefreshCw,
+  TrendingUp,
+  Trophy,
+  CheckCircle2,
+  UserPlus,
+  UserCheck,
+  MessageSquare
+} from 'lucide-react';
 
 export default function ActivityPage() {
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all'); // all, contact, company, deal, task, user
+  const [page, setPage] = useState(1);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Form states
-  const [description, setDescription] = useState('');
-  const [type, setType] = useState<ActivityLog['type']>('NOTE');
-  const [contactName, setContactName] = useState('');
-  const [dealTitle, setDealTitle] = useState('');
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const [activities, setActivities] = useState<ActivityLog[]>([
-    {
-      id: 'act-1',
-      type: 'CALL',
-      description: 'Introductory discovery call with Elon Musk regarding solar roof software licensing parameters',
-      creator: { name: 'Sarah Connor', avatarInitials: 'SC' },
-      contactName: 'Elon Musk',
-      dealTitle: 'Tesla Solar Roof Integration',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'act-2',
-      type: 'MEETING',
-      description: 'Presented AWS cloud security and high-availability architecture proposal to Microsoft stakeholders',
-      creator: { name: 'Sarah Connor', avatarInitials: 'SC' },
-      contactName: 'Satya Nadella',
-      dealTitle: 'Azure Cloud Migration Services',
-      createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-    },
-    {
-      id: 'act-3',
-      type: 'NOTE',
-      description: 'Sam Altman requested customized enterprise data compliance guarantees for GDPR standards',
-      creator: { name: 'John Doe', avatarInitials: 'JD' },
-      contactName: 'Sam Altman',
-      dealTitle: 'GPT-5 Enterprise Partnership',
-      createdAt: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
-    },
-    {
-      id: 'act-4',
-      type: 'EMAIL',
-      description: 'Sent final contract documents for GPT-5 Enterprise Partnership for digital signature execution',
-      creator: { name: 'Sarah Connor', avatarInitials: 'SC' },
-      contactName: 'Sam Altman',
-      dealTitle: 'GPT-5 Enterprise Partnership',
-      createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-    },
-    {
-      id: 'act-5',
-      type: 'SYSTEM_UPDATE',
-      description: 'Workspace Apex HQ CRM node initialized with PostgreSQL master databases healthy',
-      creator: { name: 'Sarah Connor', avatarInitials: 'SC' },
-      createdAt: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-    },
-  ]);
-
-  const handleCreateActivity = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newActivity: ActivityLog = {
-      id: `act-${Date.now()}`,
-      type,
-      description,
-      creator: { name: 'Sarah Connor', avatarInitials: 'SC' },
-      contactName: contactName || undefined,
-      dealTitle: dealTitle || undefined,
-      createdAt: new Date().toISOString(),
-    };
-
-    setActivities([newActivity, ...activities]);
-    closeModal();
-  };
-
-  const handleDeleteActivity = (id: string) => {
-    setActivities(activities.filter((a) => a.id !== id));
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setDescription('');
-    setType('NOTE');
-    setContactName('');
-    setDealTitle('');
-  };
-
-  const getActivityIcon = (type: ActivityLog['type']) => {
-    switch (type) {
-      case 'CALL':
-        return <Phone className="h-4.5 w-4.5 text-sky-400" />;
-      case 'EMAIL':
-        return <Mail className="h-4.5 w-4.5 text-amber-400" />;
-      case 'MEETING':
-        return <Calendar className="h-4.5 w-4.5 text-emerald-400" />;
-      case 'NOTE':
-        return <MessageSquare className="h-4.5 w-4.5 text-indigo-400" />;
-      default: // SYSTEM_UPDATE
-        return <Sparkles className="h-4.5 w-4.5 text-violet-400" />;
-    }
-  };
-
-  const getBadgeClass = (type: ActivityLog['type']) => {
-    switch (type) {
-      case 'CALL':
-        return 'bg-sky-500/10 text-sky-400 border-sky-500/15';
-      case 'EMAIL':
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/15';
-      case 'MEETING':
-        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15';
-      case 'NOTE':
-        return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/15';
-      default:
-        return 'bg-violet-500/10 text-violet-400 border-violet-500/15';
-    }
-  };
-
-  // Filter list
-  const filteredActivities = activities.filter((act) => {
-    const matchesSearch =
-      act.description.toLowerCase().includes(search.toLowerCase()) ||
-      (act.contactName && act.contactName.toLowerCase().includes(search.toLowerCase())) ||
-      (act.dealTitle && act.dealTitle.toLowerCase().includes(search.toLowerCase()));
-    const matchesType = typeFilter ? act.type === typeFilter : true;
-    return matchesSearch && matchesType;
+  // Fetch activities using TanStack Query
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['activities-feed', debouncedSearch, typeFilter, page],
+    queryFn: () =>
+      activitiesService.getAll(
+        debouncedSearch || undefined,
+        typeFilter === 'all' ? undefined : typeFilter,
+        page,
+        15
+      ),
   });
+
+  // Reset pagination state when filters or search change
+  useEffect(() => {
+    setPage(1);
+    setActivities([]);
+    setHasMore(true);
+  }, [debouncedSearch, typeFilter]);
+
+  // Sync loaded activities
+  useEffect(() => {
+    if (data?.data) {
+      setActivities((prev) => {
+        const existingIds = new Set(prev.map((a) => a.id));
+        const newItems = data.data.filter((a: any) => !existingIds.has(a.id));
+        return page === 1 ? data.data : [...prev, ...newItems];
+      });
+      if (data.page >= data.totalPages) {
+        setHasMore(false);
+      } else {
+        setHasMore(true);
+      }
+    }
+  }, [data, page]);
+
+  const handleTypeChange = (newType: string) => {
+    setTypeFilter(newType);
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  };
+
+  const formatRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDays = Math.floor(diffHr / 24);
+
+    if (diffSec < 60) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffDays === 1) return 'yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  const getIcon = (action: string) => {
+    switch (action) {
+      case 'created':
+        return <Plus className="h-3.5 w-3.5 text-emerald-400" />;
+      case 'updated':
+        return <RefreshCw className="h-3.5 w-3.5 text-sky-400" />;
+      case 'stage_changed':
+        return <TrendingUp className="h-3.5 w-3.5 text-amber-400" />;
+      case 'won':
+        return <Trophy className="h-3.5 w-3.5 text-yellow-400" />;
+      case 'completed':
+        return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />;
+      case 'invited':
+        return <UserPlus className="h-3.5 w-3.5 text-indigo-400" />;
+      case 'invite_accepted':
+        return <UserCheck className="h-3.5 w-3.5 text-violet-400" />;
+      case 'note_added':
+        return <MessageSquare className="h-3.5 w-3.5 text-sky-400" />;
+      default:
+        return <Sparkles className="h-3.5 w-3.5 text-indigo-400" />;
+    }
+  };
+
+  const getIconBg = (action: string) => {
+    switch (action) {
+      case 'created':
+        return 'bg-emerald-500/10 border-emerald-500/15';
+      case 'updated':
+        return 'bg-sky-500/10 border-sky-500/15';
+      case 'stage_changed':
+        return 'bg-amber-500/10 border-amber-500/15';
+      case 'won':
+        return 'bg-yellow-500/10 border-yellow-500/15';
+      case 'completed':
+        return 'bg-emerald-500/10 border-emerald-500/15';
+      case 'invited':
+        return 'bg-indigo-500/10 border-indigo-500/15';
+      case 'invite_accepted':
+        return 'bg-violet-500/10 border-violet-500/15';
+      case 'note_added':
+        return 'bg-sky-500/10 border-sky-500/15';
+      default:
+        return 'bg-indigo-500/10 border-indigo-500/15';
+    }
+  };
+
+  // Group activities into Today, Yesterday, and Earlier
+  const groupedActivities = useMemo(() => {
+    const today: any[] = [];
+    const yesterday: any[] = [];
+    const earlier: any[] = [];
+
+    const now = new Date();
+    const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayDate = new Date(todayDate);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+
+    const todayTime = todayDate.getTime();
+    const yesterdayTime = yesterdayDate.getTime();
+
+    activities.forEach((act) => {
+      const actDate = new Date(act.createdAt);
+      const actDayStart = new Date(actDate.getFullYear(), actDate.getMonth(), actDate.getDate()).getTime();
+
+      if (actDayStart === todayTime) {
+        today.push(act);
+      } else if (actDayStart === yesterdayTime) {
+        yesterday.push(act);
+      } else {
+        earlier.push(act);
+      }
+    });
+
+    return { today, yesterday, earlier };
+  }, [activities]);
+
+  const filterOptions = [
+    { label: 'All', value: 'all' },
+    { label: 'Contacts', value: 'contact' },
+    { label: 'Companies', value: 'company' },
+    { label: 'Deals', value: 'deal' },
+    { label: 'Tasks', value: 'task' },
+    { label: 'Invitations', value: 'user' },
+  ];
+
+  const renderTimelineItems = (items: any[]) => {
+    return items.map((act) => (
+      <div key={act.id} className="relative group animate-in slide-in-from-bottom-2 duration-200">
+        {/* Timeline node icon */}
+        <div
+          className={`absolute -left-9.5 top-0.5 h-7 w-7 rounded-xl bg-card border flex items-center justify-center shadow-sm z-10 ${getIconBg(
+            act.action
+          )}`}
+        >
+          {getIcon(act.action)}
+        </div>
+
+        {/* Content card */}
+        <div className="rounded-2xl border border-border bg-card/50 p-4 text-xs shadow-sm hover:bg-card/75 hover:shadow-md transition-all duration-150 relative">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 mb-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-foreground text-sm leading-tight">
+                {act.title}
+              </span>
+              <span className="inline-flex items-center rounded-lg border border-border bg-secondary/60 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wider uppercase text-muted-foreground">
+                {act.entityType}
+              </span>
+            </div>
+            <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1.5 whitespace-nowrap self-start sm:self-auto">
+              <Clock className="h-3.5 w-3.5" />
+              {formatRelativeTime(act.createdAt)}
+            </span>
+          </div>
+
+          <p className="text-muted-foreground font-medium leading-relaxed mb-3">
+            {act.description}
+          </p>
+
+          {/* Actor display */}
+          {act.actor && (
+            <div className="flex items-center gap-1.5 mt-1 border-t border-border/40 pt-2.5 pb-0.5">
+              <div className="h-5 w-5 rounded-md bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white text-[8px] font-extrabold shadow-sm border border-indigo-400/20">
+                {getInitials(act.actor.name)}
+              </div>
+              <span className="text-[10px] font-bold text-foreground">
+                {act.actor.name}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    ));
+  };
+
+  const renderSkeletons = () => (
+    <div className="space-y-8">
+      {[1, 2, 3].map((group) => (
+        <div key={group} className="space-y-4 animate-pulse">
+          <div className="h-3 w-16 bg-muted/40 rounded pl-3.5 ml-3.5" />
+          <div className="relative border-l border-border/60 pl-6 ml-3.5 space-y-6 py-2">
+            {[1, 2].map((i) => (
+              <div key={i} className="relative flex gap-4">
+                <div className="absolute -left-9.5 top-0.5 h-7 w-7 rounded-xl bg-muted/30 flex-shrink-0 border border-transparent" />
+                <div className="flex-1 rounded-2xl border border-border bg-card/25 p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="h-4.5 w-1/3 bg-muted/40 rounded" />
+                    <div className="h-3 w-12 bg-muted/40 rounded" />
+                  </div>
+                  <div className="h-3.5 w-3/4 bg-muted/30 rounded" />
+                  <div className="flex items-center gap-1.5 pt-2 border-t border-border/30">
+                    <div className="h-5 w-5 rounded-md bg-muted/40" />
+                    <div className="h-3 w-16 bg-muted/40 rounded" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderEmptyState = () => (
+    <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-border/60 bg-card/20 flex flex-col items-center justify-center">
+      <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center mb-4 text-indigo-400 border border-indigo-500/15">
+        <Sparkles className="h-5 w-5" />
+      </div>
+      <h3 className="text-sm font-bold text-foreground mb-1">No activities found</h3>
+      <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+        Try adjusting your filters or search query to locate registered interaction logs.
+      </p>
+    </div>
+  );
+
+  const hasAnyActivities = activities.length > 0;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Workspace Feed</h1>
-          <p className="text-muted-foreground mt-1.5">
-            Audit logs timeline representing full CRM interaction coordinates.
-          </p>
-        </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all"
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Entry</span>
-        </button>
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Activity Feed</h1>
+        <p className="text-muted-foreground mt-1.5 text-sm">
+          Audit logs timeline representing full CRM interaction coordinates.
+        </p>
       </div>
 
       {/* Control filters bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="flex flex-col gap-4">
         <div className="relative w-full md:max-w-md">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
             <Search className="h-4 w-4" />
@@ -175,180 +300,76 @@ export default function ActivityPage() {
           />
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <span className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
-            Filter Type
-          </span>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="w-full md:w-44 rounded-xl border border-border bg-card py-2.5 px-3 text-sm text-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all cursor-pointer"
-          >
-            <option value="">All Streams</option>
-            <option value="NOTE">Notes Only</option>
-            <option value="CALL">Calls Only</option>
-            <option value="EMAIL">Emails Only</option>
-            <option value="MEETING">Meetings Only</option>
-            <option value="SYSTEM_UPDATE">Updates Only</option>
-          </select>
+        {/* Filter Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {filterOptions.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => handleTypeChange(opt.value)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border ${
+                typeFilter === opt.value
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white border-transparent shadow-md shadow-indigo-600/10'
+                  : 'bg-card border-border hover:bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Timeline Stream */}
-      <div className="relative border-l border-border/80 pl-8 ml-4 space-y-8 py-2">
-        {filteredActivities.length > 0 ? (
-          filteredActivities.map((act) => (
-            <div key={act.id} className="relative group animate-in slide-in-from-bottom-2 duration-200">
-              {/* Timeline dot icon */}
-              <div className="absolute -left-12.5 top-1 h-9 w-9 rounded-xl bg-card border border-border flex items-center justify-center shadow-md relative z-10">
-                {getActivityIcon(act.type)}
-              </div>
-
-              {/* Feed Card Log */}
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all duration-150 relative">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 border-b border-border/50 pb-3.5 mb-3.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[9px] font-extrabold tracking-wider uppercase ${getBadgeClass(act.type)}`}>
-                      {act.type}
-                    </span>
-                    <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5" />
-                      {new Date(act.createdAt).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-5 w-5 rounded bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white text-[9px] font-extrabold shadow-sm border border-indigo-400/20">
-                        {act.creator.avatarInitials}
-                      </div>
-                      <span className="text-xs font-bold text-foreground">
-                        {act.creator.name}
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => handleDeleteActivity(act.id)}
-                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
-                      aria-label="Delete Log"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <p className="text-sm font-semibold text-foreground leading-relaxed">
-                  {act.description}
-                </p>
-
-                {/* Relational details */}
-                {(act.contactName || act.dealTitle) && (
-                  <div className="mt-3.5 flex items-center gap-3 flex-wrap">
-                    {act.contactName && (
-                      <span className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase bg-secondary border border-border/60 px-2 py-0.5 rounded">
-                        Contact: {act.contactName}
-                      </span>
-                    )}
-                    {act.dealTitle && (
-                      <span className="text-[10px] font-bold text-muted-foreground tracking-wider uppercase bg-secondary border border-border/60 px-2 py-0.5 rounded">
-                        Deal: {act.dealTitle}
-                      </span>
-                    )}
-                  </div>
-                )}
+      {isLoading && page === 1 ? (
+        renderSkeletons()
+      ) : !hasAnyActivities ? (
+        renderEmptyState()
+      ) : (
+        <div className="space-y-8">
+          {groupedActivities.today.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xs font-extrabold text-indigo-500/80 tracking-wider uppercase pl-3.5">
+                Today
+              </h3>
+              <div className="relative border-l border-border pl-6 ml-3.5 space-y-6 py-2">
+                {renderTimelineItems(groupedActivities.today)}
               </div>
             </div>
-          ))
-        ) : (
-          <div className="text-center text-muted-foreground py-12">
-            No activity streams matched standard selection coordinates.
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Add Log Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeModal} />
-
-          <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-            <h2 className="text-xl font-bold text-foreground">Record Action Activity</h2>
-            <p className="text-xs text-muted-foreground mt-1">Audit log coordinate parameters to document client coordination.</p>
-
-            <form onSubmit={handleCreateActivity} className="mt-5 space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Action Type</label>
-                <select
-                  value={type}
-                  onChange={(e: any) => setType(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-secondary/30 py-2.5 px-3 text-sm text-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all cursor-pointer"
-                >
-                  <option value="NOTE">Internal Note</option>
-                  <option value="CALL">Log Call</option>
-                  <option value="EMAIL">Log Email</option>
-                  <option value="MEETING">Log Meeting</option>
-                  <option value="SYSTEM_UPDATE">Log System Update</option>
-                </select>
+          {groupedActivities.yesterday.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xs font-extrabold text-indigo-500/80 tracking-wider uppercase pl-3.5">
+                Yesterday
+              </h3>
+              <div className="relative border-l border-border pl-6 ml-3.5 space-y-6 py-2">
+                {renderTimelineItems(groupedActivities.yesterday)}
               </div>
+            </div>
+          )}
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Log Details Description</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Completed contract negotiations for enterprise licenses upgrade with Elon Musk..."
-                  className="w-full rounded-xl border border-border bg-secondary/30 py-2.5 px-3.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all resize-none"
-                />
+          {groupedActivities.earlier.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xs font-extrabold text-indigo-500/80 tracking-wider uppercase pl-3.5">
+                Earlier
+              </h3>
+              <div className="relative border-l border-border pl-6 ml-3.5 space-y-6 py-2">
+                {renderTimelineItems(groupedActivities.earlier)}
               </div>
+            </div>
+          )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Link Contact (Name)</label>
-                  <input
-                    type="text"
-                    value={contactName}
-                    onChange={(e) => setContactName(e.target.value)}
-                    placeholder="Elon Musk"
-                    className="w-full rounded-xl border border-border bg-secondary/30 py-2.5 px-3.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Link Deal (Title)</label>
-                  <input
-                    type="text"
-                    value={dealTitle}
-                    onChange={(e) => setDealTitle(e.target.value)}
-                    placeholder="Tesla Solar Roof Upgrade"
-                    className="w-full rounded-xl border border-border bg-secondary/30 py-2.5 px-3.5 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-secondary transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 text-sm transition-all cursor-pointer"
-                >
-                  Save Log Entry
-                </button>
-              </div>
-            </form>
-          </div>
+          {/* Load More trigger */}
+          {hasMore && (
+            <div className="text-center pt-4">
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={isFetching}
+                className="inline-flex items-center justify-center px-5 py-2.5 border border-border bg-card hover:bg-secondary rounded-xl text-xs font-bold text-foreground transition-all disabled:opacity-50 cursor-pointer shadow-sm hover:shadow"
+              >
+                {isFetching ? 'Loading more...' : 'Load More Activities'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

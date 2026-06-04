@@ -37,6 +37,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contactsService } from '@/services/api';
 import { usePermissions } from '@/hooks/usePermissions';
+import ActivityTimeline from '@/components/ActivityTimeline';
 
 interface ContactActivity {
   id: string;
@@ -829,7 +830,7 @@ export default function ContactsPage() {
               {/* Activity feeds Specific to Contact */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Historical Activities</h3>
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Activity Timeline</h3>
                 </div>
 
                 {/* Add note specifically inside drawer */}
@@ -852,48 +853,8 @@ export default function ContactsPage() {
                 )}
 
                 {/* Chronological mini feed */}
-                <div className="relative border-l border-border/80 pl-6 ml-3.5 space-y-4">
-                  {selectedContact.activities && selectedContact.activities.length > 0 ? (
-                    selectedContact.activities.map((act) => {
-                      const getActIcon = (t: ContactActivity['type']) => {
-                        switch (t) {
-                          case 'CALL':
-                            return <Phone className="h-3 w-3 text-sky-400" />;
-                          case 'EMAIL':
-                            return <Mail className="h-3 w-3 text-amber-400" />;
-                          case 'MEETING':
-                            return <Calendar className="h-3 w-3 text-emerald-400" />;
-                          default:
-                            return <MessageSquare className="h-3 w-3 text-indigo-400" />;
-                        }
-                      };
-                      return (
-                        <div key={act.id} className="relative group">
-                          {/* Timeline dot */}
-                          <div className="absolute -left-8 top-0.5 h-6.5 w-6.5 rounded-lg bg-card border border-border flex items-center justify-center shadow-sm z-10">
-                            {getActIcon(act.type)}
-                          </div>
-                          <div className="rounded-xl border border-border bg-card/60 p-3 text-xs shadow-sm relative">
-                            <span className="text-[10px] font-extrabold text-muted-foreground">
-                              {new Date(act.createdAt).toLocaleDateString(undefined, {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
-                            <p className="mt-1 text-foreground font-semibold leading-relaxed">
-                              {act.description}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center text-xs text-muted-foreground/60 py-6">
-                      No activities registered for this contact.
-                    </div>
-                  )}
+                <div className="mt-4">
+                  <ActivityTimeline entityType="contact" entityId={selectedContact.id} />
                 </div>
               </div>
             </div>

@@ -309,3 +309,22 @@ export const tasksService = {
     return res.data;
   },
 };
+
+export const activitiesService = {
+  getAll: async (search?: string, type?: string, page?: number, limit?: number) => {
+    const params: any = {};
+    if (search) params.search = search;
+    if (type) params.type = type;
+    if (page) params.page = page;
+    if (limit) params.limit = limit;
+    const res = await apiClient.get('/activities', { params });
+    return res.data;
+  },
+  getByEntity: async (entityType: string, entityId: string, page?: number, limit?: number) => {
+    const params: any = {};
+    if (page) params.page = page;
+    if (limit) params.limit = limit;
+    const res = await apiClient.get(`/activities/entity/${entityType}/${entityId}`, { params });
+    return res.data;
+  },
+};

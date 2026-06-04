@@ -13,11 +13,13 @@ import {
   XCircle,
   Calendar,
   User,
-  Clock
+  Clock,
+  X
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksService, authService } from '@/services/api';
 import { usePermissions } from '@/hooks/usePermissions';
+import ActivityTimeline from '@/components/ActivityTimeline';
 
 interface Task {
   id: string;
@@ -41,6 +43,20 @@ export default function TasksPage() {
   const canUpdate = hasPermission('tasks.update');
   const canDelete = hasPermission('tasks.delete');
   const [mounted, setMounted] = useState(false);
+
+  // Drawer States
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const handleOpenDrawer = (task: Task) => {
+    setSelectedTask(task);
+    setDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setSelectedTask(null);
+    setDrawerOpen(false);
+  };
 
   // Search and status filters
   const [search, setSearch] = useState('');
@@ -432,10 +448,8 @@ export default function TasksPage() {
                         <div className="flex items-center gap-3.5 flex-1 min-w-0">
                           {getStatusIcon(task.status, task.id)}
                           <span
-                            onClick={() => canUpdate && handleToggleStatus(task.id, task.status)}
-                            className={`text-sm font-semibold truncate hover:text-indigo-400 transition-colors ${
-                              canUpdate ? 'cursor-pointer' : ''
-                            } ${
+                            onClick={() => handleOpenDrawer(task)}
+                            className={`text-sm font-semibold truncate hover:text-indigo-400 transition-colors cursor-pointer ${
                               task.status === 'DONE' ? 'line-through text-muted-foreground/60' : 'text-foreground'
                             }`}
                           >
@@ -594,6 +608,78 @@ export default function TasksPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Slide-out Task Details Drawer */}
+      {drawerOpen && selectedTask && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={handleCloseDrawer}
+          />
+          <div className="relative w-full max-w-xl bg-card border-l border-border h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-200">
+            {/* Header */}
+            <div className="flex h-16 items-center justify-between px-6 border-b border-border bg-secondary/10">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-indigo-500" />
+                <span className="text-sm font-bold text-foreground">Task Details</span>
+              </div>
+              <button
+                onClick={handleCloseDrawer}
+                className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Profile Card */}
+              <div className="rounded-2xl border border-border bg-muted/10 p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1">
+                    {getStatusIcon(selectedTask.status)}
+                  </div>
+                  <div className="flex flex-col">
+                    <h2 className={`text-base font-bold leading-snug ${
+                      selectedTask.status === 'DONE' ? 'line-through text-muted-foreground/60' : 'text-foreground'
+                    }`}>
+                      {selectedTask.title}
+                    </h2>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 pt-2 border-t border-border/40 text-xs">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block mb-0.5">Status</span>
+                    <span className="font-semibold text-foreground">{selectedTask.status}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block mb-0.5">Priority</span>
+                    <span className="font-semibold text-foreground">{selectedTask.priority}</span>
+                  </div>
+                  {selectedTask.dueDate && (
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block mb-0.5">Due Date</span>
+                      <span className="font-semibold text-foreground">
+                        {new Date(selectedTask.dueDate).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Activity Timeline Section */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Activity Timeline</h3>
+                <ActivityTimeline entityType="task" entityId={selectedTask.id} />
+              </div>
+            </div>
           </div>
         </div>
       )}
