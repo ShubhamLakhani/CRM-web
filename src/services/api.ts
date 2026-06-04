@@ -328,3 +328,26 @@ export const activitiesService = {
     return res.data;
   },
 };
+
+export const notificationsService = {
+  getAll: async (unreadOnly?: boolean, page?: number, limit?: number) => {
+    const params: any = {};
+    if (unreadOnly !== undefined) params.unreadOnly = unreadOnly;
+    if (page !== undefined) params.page = page;
+    if (limit !== undefined) params.limit = limit;
+    const res = await apiClient.get('/notifications', { params });
+    return res.data;
+  },
+  getUnreadCount: async () => {
+    const res = await apiClient.get('/notifications/unread-count');
+    return res.data;
+  },
+  markAsRead: async (id: string) => {
+    const res = await apiClient.patch(`/notifications/${id}/read`);
+    return res.data;
+  },
+  markAllAsRead: async () => {
+    const res = await apiClient.post('/notifications/read');
+    return res.data;
+  },
+};

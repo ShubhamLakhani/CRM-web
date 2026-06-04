@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCRMStore } from '../store/crmStore';
 import { useAuth } from '../providers/AuthProvider';
 import { Sun, Moon, LogOut, User, Menu, ChevronRight, Search, Settings, HelpCircle, Bell } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -98,10 +99,7 @@ export default function Header({ onMenuClick, onSearchClick }: HeaderProps) {
         </button>
 
         {/* Notification Bell */}
-        <button className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary border border-border/40 transition-all cursor-pointer relative">
-          <Bell className="h-4.5 w-4.5" />
-          <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-indigo-500" />
-        </button>
+        <NotificationBell />
 
         {/* Theme Switcher Button */}
         <button

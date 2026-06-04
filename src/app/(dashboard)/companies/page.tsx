@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { companiesService } from '@/services/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import ActivityTimeline from '@/components/ActivityTimeline';
+import { useSearchParams } from 'next/navigation';
 
 interface Company {
   id: string;
@@ -69,6 +70,9 @@ export default function CompaniesPage() {
     setMounted(true);
   }, []);
 
+  const searchParams = useSearchParams();
+  const companyIdParam = searchParams.get('companyId');
+
   // 1. Fetch Companies list using TanStack Query
   const companiesQuery = useQuery<{ data: Company[]; meta: any }>({
     queryKey: ['companies', search, industryFilter],
@@ -76,6 +80,24 @@ export default function CompaniesPage() {
   });
 
   const companies = useMemo(() => companiesQuery.data?.data || [], [companiesQuery.data]);
+
+  useEffect(() => {
+    if (companyIdParam && companies.length > 0) {
+      const found = companies.find((c) => c.id === companyIdParam);
+      if (found) {
+        handleOpenDrawer(found);
+      } else {
+        companiesService
+          .getOne(companyIdParam)
+          .then((company) => {
+            if (company) {
+              handleOpenDrawer(company);
+            }
+          })
+          .catch((err) => console.error('Failed to load deep-linked company', err));
+      }
+    }
+  }, [companyIdParam, companies]);
 
   // Premium Logo Gradient Helper based consistently on Company name / ID hash
   const getLogoColor = (id: string) => {

@@ -20,6 +20,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksService, authService } from '@/services/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import ActivityTimeline from '@/components/ActivityTimeline';
+import { useSearchParams } from 'next/navigation';
 
 interface Task {
   id: string;
@@ -75,6 +76,9 @@ export default function TasksPage() {
     setMounted(true);
   }, []);
 
+  const searchParams = useSearchParams();
+  const taskIdParam = searchParams.get('taskId');
+
   // 1. Fetch active tasks matching search/filters
   const tasksQuery = useQuery<Task[]>({
     queryKey: ['tasks', search, statusFilter],
@@ -82,6 +86,24 @@ export default function TasksPage() {
   });
 
   const tasks = useMemo(() => tasksQuery.data || [], [tasksQuery.data]);
+
+  useEffect(() => {
+    if (taskIdParam && tasks.length > 0) {
+      const found = tasks.find((t) => t.id === taskIdParam);
+      if (found) {
+        handleOpenDrawer(found);
+      } else {
+        tasksService
+          .getOne(taskIdParam)
+          .then((task) => {
+            if (task) {
+              handleOpenDrawer(task);
+            }
+          })
+          .catch((err) => console.error('Failed to load deep-linked task', err));
+      }
+    }
+  }, [taskIdParam, tasks]);
 
   // 2. Fetch organization users to populate assignee selection list
   const usersQuery = useQuery<any[]>({

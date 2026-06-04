@@ -22,6 +22,7 @@ import { dealsService, contactsService } from '@/services/api';
 import { useFeatures } from '@/hooks/useFeatures';
 import { usePermissions } from '@/hooks/usePermissions';
 import ActivityTimeline from '@/components/ActivityTimeline';
+import { useSearchParams } from 'next/navigation';
 
 interface DealActivity {
   id: string;
@@ -80,6 +81,9 @@ export default function DealsPage() {
   const [drawerContactId, setDrawerContactId] = useState('');
   const [newNoteText, setNewNoteText] = useState('');
 
+  const searchParams = useSearchParams();
+  const dealIdParam = searchParams.get('dealId');
+
   // 1. Fetch all deals
   const dealsQuery = useQuery<Deal[]>({
     queryKey: ['deals'],
@@ -87,6 +91,24 @@ export default function DealsPage() {
   });
 
   const deals = useMemo(() => dealsQuery.data || [], [dealsQuery.data]);
+
+  useEffect(() => {
+    if (dealIdParam && deals.length > 0) {
+      const found = deals.find((d) => d.id === dealIdParam);
+      if (found) {
+        handleOpenDrawer(found);
+      } else {
+        dealsService
+          .getOne(dealIdParam)
+          .then((deal) => {
+            if (deal) {
+              handleOpenDrawer(deal);
+            }
+          })
+          .catch((err) => console.error('Failed to load deep-linked deal', err));
+      }
+    }
+  }, [dealIdParam, deals]);
 
   // 2. Fetch contacts for dropdown selection
   const contactsQuery = useQuery({

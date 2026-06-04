@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -38,6 +38,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contactsService } from '@/services/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import ActivityTimeline from '@/components/ActivityTimeline';
+import { useSearchParams } from 'next/navigation';
 
 interface ContactActivity {
   id: string;
@@ -95,6 +96,9 @@ export default function ContactsPage() {
   // Floating Bulk actions state
   const [bulkStatusInput, setBulkStatusInput] = useState<'LEAD' | 'CONTACTED' | 'CUSTOMER' | 'CHURNED'>('CUSTOMER');
 
+  const searchParams = useSearchParams();
+  const contactIdParam = searchParams.get('contactId');
+
   // TanStack Query list fetch
   const contactsQuery = useQuery({
     queryKey: ['contacts', searchQuery, statusFilter],
@@ -102,6 +106,24 @@ export default function ContactsPage() {
   });
 
   const contacts = useMemo(() => contactsQuery.data?.data || [], [contactsQuery.data]);
+
+  useEffect(() => {
+    if (contactIdParam && contacts.length > 0) {
+      const found = contacts.find((c: any) => c.id === contactIdParam);
+      if (found) {
+        handleOpenDrawer(found);
+      } else {
+        contactsService
+          .getOne(contactIdParam)
+          .then((contact) => {
+            if (contact) {
+              handleOpenDrawer(contact);
+            }
+          })
+          .catch((err) => console.error('Failed to load deep-linked contact', err));
+      }
+    }
+  }, [contactIdParam, contacts]);
 
   // Dynamic mapping of company names to companyIds gathered from fetched contacts
   const companyMap = useMemo(() => {
