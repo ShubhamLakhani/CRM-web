@@ -25,11 +25,15 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+import { usePermissions } from '../../../hooks/usePermissions';
+
 export default function SettingsPage() {
   const { theme, toggleTheme } = useCRMStore();
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
   const [activeTab, setActiveTab] = useState<'general' | 'team' | 'features'>('general');
-  const canManageFeatures = user?.role === 'OWNER' || user?.role === 'ADMIN';
+  const canManageFeatures = hasPermission('billing.manage');
+  const canInvite = hasPermission('users.invite');
 
   // Team management state
   const [members, setMembers] = useState<any[]>([]);
@@ -310,75 +314,77 @@ export default function SettingsPage() {
           {activeTab === 'team' && (
             <div className="space-y-6">
               {/* Invite Member Section */}
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-md">
-                <h2 className="text-lg font-bold text-foreground">Invite Workspace Operators</h2>
-                <p className="text-xs text-muted-foreground font-semibold mt-1">Send cryptographically secure invitation links</p>
+              {canInvite && (
+                <div className="rounded-2xl border border-border bg-card p-6 shadow-md">
+                  <h2 className="text-lg font-bold text-foreground">Invite Workspace Operators</h2>
+                  <p className="text-xs text-muted-foreground font-semibold mt-1">Send cryptographically secure invitation links</p>
 
-                <form onSubmit={handleSendInvite} className="mt-5 space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
-                        <Mail className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="email"
-                        required
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="operator@company.com"
-                        className="w-full rounded-xl border border-border bg-secondary/15 py-3 pl-10 pr-4 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50 transition-all font-medium"
-                      />
-                    </div>
-                    <select
-                      value={inviteRole}
-                      onChange={(e) => setInviteRole(e.target.value)}
-                      className="rounded-xl border border-border bg-card hover:bg-secondary/40 py-3 px-4 text-sm font-semibold text-foreground outline-none cursor-pointer transition-all"
-                    >
-                      <option value="ADMIN">Admin</option>
-                      <option value="MANAGER">Manager</option>
-                      <option value="SALES">Sales</option>
-                      <option value="SUPPORT">Support</option>
-                      <option value="VIEWER">Viewer</option>
-                    </select>
-                    <button
-                      type="submit"
-                      disabled={inviteLoading}
-                      className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 py-3 px-6 text-sm font-bold text-white shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2"
-                    >
-                      {inviteLoading ? (
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        <>
-                          <Send className="h-4 w-4" />
-                          <span>Invite Member</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {inviteSuccessMsg && (
-                    <div className="rounded-xl border border-indigo-500/10 bg-indigo-500/5 p-4 space-y-3">
-                      <div className="flex items-center gap-2 text-xs font-bold text-indigo-400">
-                        <Check className="h-4 w-4 text-emerald-400" />
-                        <span>{inviteSuccessMsg}</span>
+                  <form onSubmit={handleSendInvite} className="mt-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
+                          <Mail className="h-4 w-4" />
+                        </span>
+                        <input
+                          type="email"
+                          required
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          placeholder="operator@company.com"
+                          className="w-full rounded-xl border border-border bg-secondary/15 py-3 pl-10 pr-4 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50 transition-all font-medium"
+                        />
                       </div>
-                      {generatedLink && (
-                        <div className="flex items-center justify-between gap-3 bg-slate-900/60 p-2.5 rounded-lg border border-white/5">
-                          <span className="text-[10px] font-mono text-muted-foreground truncate select-all">{generatedLink}</span>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(generatedLink, 'invite-success')}
-                            className="flex-shrink-0 flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors p-1"
-                          >
-                            {copiedLinkId === 'invite-success' ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-                            <span>{copiedLinkId === 'invite-success' ? 'Copied' : 'Copy'}</span>
-                          </button>
-                        </div>
-                      )}
+                      <select
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value)}
+                        className="rounded-xl border border-border bg-card hover:bg-secondary/40 py-3 px-4 text-sm font-semibold text-foreground outline-none cursor-pointer transition-all"
+                      >
+                        <option value="ADMIN">Admin</option>
+                        <option value="MANAGER">Manager</option>
+                        <option value="SALES">Sales</option>
+                        <option value="SUPPORT">Support</option>
+                        <option value="VIEWER">Viewer</option>
+                      </select>
+                      <button
+                        type="submit"
+                        disabled={inviteLoading}
+                        className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 py-3 px-6 text-sm font-bold text-white shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2"
+                      >
+                        {inviteLoading ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4" />
+                            <span>Invite Member</span>
+                          </>
+                        )}
+                      </button>
                     </div>
-                  )}
-                </form>
-              </div>
+
+                    {inviteSuccessMsg && (
+                      <div className="rounded-xl border border-indigo-500/10 bg-indigo-500/5 p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-xs font-bold text-indigo-400">
+                          <Check className="h-4 w-4 text-emerald-400" />
+                          <span>{inviteSuccessMsg}</span>
+                        </div>
+                        {generatedLink && (
+                          <div className="flex items-center justify-between gap-3 bg-slate-900/60 p-2.5 rounded-lg border border-white/5">
+                            <span className="text-[10px] font-mono text-muted-foreground truncate select-all">{generatedLink}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(generatedLink, 'invite-success')}
+                              className="flex-shrink-0 flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors p-1"
+                            >
+                              {copiedLinkId === 'invite-success' ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                              <span>{copiedLinkId === 'invite-success' ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </form>
+                </div>
+              )}
 
               {/* Members List Section */}
               <div className="rounded-2xl border border-border bg-card p-6 shadow-md">
@@ -435,74 +441,76 @@ export default function SettingsPage() {
               </div>
 
               {/* Pending Invites List Section */}
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-md">
-                <div>
-                  <h2 className="text-lg font-bold text-foreground">Pending Invitations</h2>
-                  <p className="text-xs text-muted-foreground font-semibold mt-1">Sent invites awaiting user acceptance</p>
-                </div>
+              {canInvite && (
+                <div className="rounded-2xl border border-border bg-card p-6 shadow-md">
+                  <div>
+                    <h2 className="text-lg font-bold text-foreground">Pending Invitations</h2>
+                    <p className="text-xs text-muted-foreground font-semibold mt-1">Sent invites awaiting user acceptance</p>
+                  </div>
 
-                <div className="mt-5 overflow-hidden rounded-xl border border-border bg-secondary/10">
-                  {invitesLoading ? (
-                    <div className="p-8 text-center text-xs font-bold text-muted-foreground">Loading pending invitations...</div>
-                  ) : pendingInvites.length === 0 ? (
-                    <div className="p-8 text-center text-xs font-medium text-muted-foreground flex flex-col items-center gap-1">
-                      <AlertCircle className="h-5 w-5 text-muted-foreground/60" />
-                      <span>No pending invitations active.</span>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-border">
-                      {pendingInvites.map((invite) => {
-                        const acceptLink = `${window.location.origin}/invite/accept?token=${invite.token}`;
-                        return (
-                          <div key={invite.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 hover:bg-secondary/20 transition-all">
-                            <div className="space-y-1">
-                              <div className="text-xs font-bold text-foreground flex items-center gap-2">
-                                <span>{invite.email}</span>
-                                <span className="text-[9px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/15 rounded px-1.5">
-                                  {invite.roleId}
-                                </span>
+                  <div className="mt-5 overflow-hidden rounded-xl border border-border bg-secondary/10">
+                    {invitesLoading ? (
+                      <div className="p-8 text-center text-xs font-bold text-muted-foreground">Loading pending invitations...</div>
+                    ) : pendingInvites.length === 0 ? (
+                      <div className="p-8 text-center text-xs font-medium text-muted-foreground flex flex-col items-center gap-1">
+                        <AlertCircle className="h-5 w-5 text-muted-foreground/60" />
+                        <span>No pending invitations active.</span>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {pendingInvites.map((invite) => {
+                          const acceptLink = `${window.location.origin}/invite/accept?token=${invite.token}`;
+                          return (
+                            <div key={invite.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4 hover:bg-secondary/20 transition-all">
+                              <div className="space-y-1">
+                                <div className="text-xs font-bold text-foreground flex items-center gap-2">
+                                  <span>{invite.email}</span>
+                                  <span className="text-[9px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/15 rounded px-1.5">
+                                    {invite.roleId}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                                  <span>Invited by {invite.invitedBy?.name}</span>
+                                  <span>•</span>
+                                  <span>Expires {new Date(invite.expiresAt).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-slate-900/60 p-1.5 rounded-lg border border-white/5 max-w-xs mt-1">
+                                  <span className="text-[9px] font-mono text-muted-foreground truncate">{acceptLink}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => copyToClipboard(acceptLink, invite.id)}
+                                    className="flex-shrink-0 flex items-center gap-1 text-[9px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors p-1"
+                                  >
+                                    {copiedLinkId === invite.id ? <Check className="h-2.5 w-2.5 text-emerald-400" /> : <Copy className="h-2.5 w-2.5" />}
+                                    <span>{copiedLinkId === invite.id ? 'Copied' : 'Copy Link'}</span>
+                                  </button>
+                                </div>
                               </div>
-                              <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                                <span>Invited by {invite.invitedBy?.name}</span>
-                                <span>•</span>
-                                <span>Expires {new Date(invite.expiresAt).toLocaleDateString()}</span>
-                              </div>
-                              <div className="flex items-center gap-2 bg-slate-900/60 p-1.5 rounded-lg border border-white/5 max-w-xs mt-1">
-                                <span className="text-[9px] font-mono text-muted-foreground truncate">{acceptLink}</span>
+
+                              <div className="flex items-center gap-2 self-end sm:self-center">
                                 <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(acceptLink, invite.id)}
-                                  className="flex-shrink-0 flex items-center gap-1 text-[9px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors p-1"
+                                  onClick={() => handleResendInvite(invite.id)}
+                                  className="flex items-center justify-center gap-1 text-[10px] font-bold bg-secondary hover:bg-secondary/70 border border-border text-foreground px-3 py-2 rounded-xl cursor-pointer transition-all"
                                 >
-                                  {copiedLinkId === invite.id ? <Check className="h-2.5 w-2.5 text-emerald-400" /> : <Copy className="h-2.5 w-2.5" />}
-                                  <span>{copiedLinkId === invite.id ? 'Copied' : 'Copy Link'}</span>
+                                  <RefreshCw className="h-3 w-3" />
+                                  <span>Renew</span>
+                                </button>
+                                <button
+                                  onClick={() => handleRevokeInvite(invite.id)}
+                                  className="flex items-center justify-center gap-1 text-[10px] font-bold bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 px-3 py-2 rounded-xl cursor-pointer transition-all"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                  <span>Revoke</span>
                                 </button>
                               </div>
                             </div>
-
-                            <div className="flex items-center gap-2 self-end sm:self-center">
-                              <button
-                                onClick={() => handleResendInvite(invite.id)}
-                                className="flex items-center justify-center gap-1 text-[10px] font-bold bg-secondary hover:bg-secondary/70 border border-border text-foreground px-3 py-2 rounded-xl cursor-pointer transition-all"
-                              >
-                                <RefreshCw className="h-3 w-3" />
-                                <span>Renew</span>
-                              </button>
-                              <button
-                                onClick={() => handleRevokeInvite(invite.id)}
-                                className="flex items-center justify-center gap-1 text-[10px] font-bold bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 px-3 py-2 rounded-xl cursor-pointer transition-all"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                                <span>Revoke</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 

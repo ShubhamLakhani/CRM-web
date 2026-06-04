@@ -68,6 +68,7 @@ export default function ContactsPage() {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('contacts.create');
+  const canUpdate = hasPermission('contacts.update');
   const canDelete = hasPermission('contacts.delete');
 
   // UI Control states
@@ -735,16 +736,18 @@ export default function ContactsPage() {
                   <div className="flex flex-col min-w-0">
                     <input
                       type="text"
+                      disabled={!canUpdate}
                       value={selectedContact.name}
                       onChange={(e) => handleUpdateDrawerField('name', e.target.value)}
-                      className="text-lg font-bold text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-indigo-500 outline-none transition-colors w-full"
+                      className="text-lg font-bold text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-indigo-500 outline-none transition-colors w-full disabled:hover:border-transparent disabled:cursor-not-allowed"
                     />
                     <input
                       type="text"
+                      disabled={!canUpdate}
                       value={typeof selectedContact.company === 'object' && selectedContact.company ? selectedContact.company.name : (selectedContact.company || '')}
                       onChange={(e) => handleUpdateDrawerField('company', e.target.value)}
                       placeholder="Specify company"
-                      className="text-xs font-semibold text-muted-foreground bg-transparent border-b border-transparent hover:border-border focus:border-indigo-500 outline-none mt-1 transition-colors w-full"
+                      className="text-xs font-semibold text-muted-foreground bg-transparent border-b border-transparent hover:border-border focus:border-indigo-500 outline-none mt-1 transition-colors w-full disabled:hover:border-transparent disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -758,9 +761,10 @@ export default function ContactsPage() {
                     <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Email Address</label>
                     <input
                       type="email"
+                      disabled={!canUpdate}
                       value={selectedContact.email}
                       onChange={(e) => handleUpdateDrawerField('email', e.target.value)}
-                      className="w-full text-xs font-bold text-foreground bg-transparent border border-transparent hover:border-border focus:border-indigo-500/50 py-1 px-2 rounded-lg outline-none transition-all"
+                      className="w-full text-xs font-bold text-foreground bg-transparent border border-transparent hover:border-border focus:border-indigo-500/50 py-1 px-2 rounded-lg outline-none transition-all disabled:hover:border-transparent disabled:cursor-not-allowed"
                     />
                   </div>
 
@@ -768,18 +772,20 @@ export default function ContactsPage() {
                     <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Phone Number</label>
                     <input
                       type="text"
+                      disabled={!canUpdate}
                       value={selectedContact.phone}
                       onChange={(e) => handleUpdateDrawerField('phone', e.target.value)}
-                      className="w-full text-xs font-bold text-foreground bg-transparent border border-transparent hover:border-border focus:border-indigo-500/50 py-1 px-2 rounded-lg outline-none transition-all"
+                      className="w-full text-xs font-bold text-foreground bg-transparent border border-transparent hover:border-border focus:border-indigo-500/50 py-1 px-2 rounded-lg outline-none transition-all disabled:hover:border-transparent disabled:cursor-not-allowed"
                     />
                   </div>
 
                   <div className="space-y-1 sm:col-span-2">
                     <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Lifecycle Stage</label>
                     <select
+                      disabled={!canUpdate}
                       value={selectedContact.status}
                       onChange={(e) => handleUpdateDrawerField('status', e.target.value)}
-                      className="w-full text-xs font-bold text-foreground bg-card border border-border rounded-lg py-1.5 px-2 outline-none focus:border-indigo-500/50 transition-all cursor-pointer"
+                      className="w-full text-xs font-bold text-foreground bg-card border border-border rounded-lg py-1.5 px-2 outline-none focus:border-indigo-500/50 transition-all cursor-pointer disabled:cursor-not-allowed"
                     >
                       <option value="LEAD">Lead</option>
                       <option value="CONTACTED">Contacted</option>
@@ -827,21 +833,23 @@ export default function ContactsPage() {
                 </div>
 
                 {/* Add note specifically inside drawer */}
-                <form onSubmit={handleAddDrawerNote} className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Log a new detail note..."
-                    value={newNoteText}
-                    onChange={(e) => setNewNoteText(e.target.value)}
-                    className="flex-1 rounded-xl border border-border bg-secondary/20 py-2 px-3 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50 transition-all"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-2 text-xs transition-colors cursor-pointer"
-                  >
-                    Add Note
-                  </button>
-                </form>
+                {canUpdate && (
+                  <form onSubmit={handleAddDrawerNote} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Log a new detail note..."
+                      value={newNoteText}
+                      onChange={(e) => setNewNoteText(e.target.value)}
+                      className="flex-1 rounded-xl border border-border bg-secondary/20 py-2 px-3 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50 transition-all"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-2 text-xs transition-colors cursor-pointer"
+                    >
+                      Add Note
+                    </button>
+                  </form>
+                )}
 
                 {/* Chronological mini feed */}
                 <div className="relative border-l border-border/80 pl-6 ml-3.5 space-y-4">
@@ -894,7 +902,7 @@ export default function ContactsPage() {
       )}
 
       {/* Floating Bulk Actions bar */}
-      {isBulkSelected && (
+      {isBulkSelected && (canUpdate || canDelete) && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-xl px-4 animate-in slide-in-from-bottom duration-250">
           <div className="rounded-2xl border border-border bg-slate-950/80 p-4 shadow-xl backdrop-blur-md flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
@@ -905,31 +913,37 @@ export default function ContactsPage() {
             </div>
 
             <div className="flex items-center gap-2.5">
-              <select
-                value={bulkStatusInput}
-                onChange={(e: any) => setBulkStatusInput(e.target.value)}
-                className="rounded-lg border border-white/5 bg-slate-900 py-1.5 px-2 text-xs text-white outline-none cursor-pointer focus:border-indigo-500/50"
-              >
-                <option value="LEAD">Leads</option>
-                <option value="CONTACTED">Contacted</option>
-                <option value="CUSTOMER">Customers</option>
-                <option value="CHURNED">Churned</option>
-              </select>
+              {canUpdate && (
+                <>
+                  <select
+                    value={bulkStatusInput}
+                    onChange={(e: any) => setBulkStatusInput(e.target.value)}
+                    className="rounded-lg border border-white/5 bg-slate-900 py-1.5 px-2 text-xs text-white outline-none cursor-pointer focus:border-indigo-500/50"
+                  >
+                    <option value="LEAD">Leads</option>
+                    <option value="CONTACTED">Contacted</option>
+                    <option value="CUSTOMER">Customers</option>
+                    <option value="CHURNED">Churned</option>
+                  </select>
 
-              <button
-                onClick={handleBulkStatusChange}
-                className="rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1.5 text-xs transition-colors cursor-pointer"
-              >
-                Update Statuses
-              </button>
+                  <button
+                    onClick={handleBulkStatusChange}
+                    className="rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-1.5 text-xs transition-colors cursor-pointer"
+                  >
+                    Update Statuses
+                  </button>
+                </>
+              )}
 
-              <button
-                onClick={handleBulkDelete}
-                className="p-1.5 rounded-lg border border-white/5 bg-slate-900 hover:bg-rose-500/10 text-rose-400 transition-colors cursor-pointer"
-                aria-label="Bulk Delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {canDelete && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="p-1.5 rounded-lg border border-white/5 bg-slate-900 hover:bg-rose-500/10 text-rose-400 transition-colors cursor-pointer"
+                  aria-label="Bulk Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
 
               <button
                 onClick={() => setRowSelection({})}

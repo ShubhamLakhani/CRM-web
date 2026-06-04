@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksService, authService } from '@/services/api';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Task {
   id: string;
@@ -35,6 +36,10 @@ interface Task {
 
 export default function TasksPage() {
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('tasks.create');
+  const canUpdate = hasPermission('tasks.update');
+  const canDelete = hasPermission('tasks.delete');
   const [mounted, setMounted] = useState(false);
 
   // Search and status filters
@@ -230,40 +235,47 @@ export default function TasksPage() {
   };
 
   const getStatusIcon = (status: Task['status'], id?: string) => {
+    const cursorClass = canUpdate ? 'cursor-pointer' : '';
+    const clickHandler = (currentStatus: Task['status']) => {
+      if (canUpdate && id) {
+        handleToggleStatus(id, currentStatus);
+      }
+    };
+
     switch (status) {
       case 'DONE':
         return (
           <CheckCircle2
-            className="h-4.5 w-4.5 text-emerald-500 cursor-pointer"
-            onClick={() => id && handleToggleStatus(id, status)}
+            className={`h-4.5 w-4.5 text-emerald-500 ${cursorClass}`}
+            onClick={() => clickHandler(status)}
           />
         );
       case 'IN_PROGRESS':
         return (
           <PlayCircle
-            className="h-4.5 w-4.5 text-sky-400 cursor-pointer"
-            onClick={() => id && handleToggleStatus(id, status)}
+            className={`h-4.5 w-4.5 text-sky-400 ${cursorClass}`}
+            onClick={() => clickHandler(status)}
           />
         );
       case 'BACKLOG':
         return (
           <HelpCircle
-            className="h-4.5 w-4.5 text-muted-foreground/60 cursor-pointer"
-            onClick={() => id && handleToggleStatus(id, status)}
+            className={`h-4.5 w-4.5 text-muted-foreground/60 ${cursorClass}`}
+            onClick={() => clickHandler(status)}
           />
         );
       case 'CANCELED':
         return (
           <XCircle
-            className="h-4.5 w-4.5 text-rose-500/60 cursor-pointer"
-            onClick={() => id && handleToggleStatus(id, status)}
+            className={`h-4.5 w-4.5 text-rose-500/60 ${cursorClass}`}
+            onClick={() => clickHandler(status)}
           />
         );
       default: // TODO
         return (
           <Circle
-            className="h-4.5 w-4.5 text-amber-500 cursor-pointer"
-            onClick={() => id && handleToggleStatus(id, status)}
+            className={`h-4.5 w-4.5 text-amber-500 ${cursorClass}`}
+            onClick={() => clickHandler(status)}
           />
         );
     }
@@ -343,13 +355,15 @@ export default function TasksPage() {
             Linear-style task tracking, assignee checkpoints, and priorities management.
           </p>
         </div>
-        <button
-          onClick={openCreateModal => setIsModalOpen(true)}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Task</span>
-        </button>
+        {canCreate && (
+          <button
+            onClick={openCreateModal => setIsModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Task</span>
+          </button>
+        )}
       </div>
 
       {/* Control filters */}
@@ -418,8 +432,10 @@ export default function TasksPage() {
                         <div className="flex items-center gap-3.5 flex-1 min-w-0">
                           {getStatusIcon(task.status, task.id)}
                           <span
-                            onClick={() => handleToggleStatus(task.id, task.status)}
-                            className={`text-sm font-semibold truncate cursor-pointer hover:text-indigo-400 transition-colors ${
+                            onClick={() => canUpdate && handleToggleStatus(task.id, task.status)}
+                            className={`text-sm font-semibold truncate hover:text-indigo-400 transition-colors ${
+                              canUpdate ? 'cursor-pointer' : ''
+                            } ${
                               task.status === 'DONE' ? 'line-through text-muted-foreground/60' : 'text-foreground'
                             }`}
                           >
@@ -454,13 +470,15 @@ export default function TasksPage() {
                             </div>
                           )}
 
-                          <button
-                            onClick={() => handleDeleteTask(task.id)}
-                            className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer animate-in fade-in duration-100"
-                            aria-label="Delete Task"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer animate-in fade-in duration-100"
+                              aria-label="Delete Task"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))

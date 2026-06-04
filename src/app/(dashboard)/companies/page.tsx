@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { companiesService } from '@/services/api';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface Company {
   id: string;
@@ -30,6 +31,10 @@ interface Company {
 
 export default function CompaniesPage() {
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('companies.create');
+  const canUpdate = hasPermission('companies.update');
+  const canDelete = hasPermission('companies.delete');
   const [mounted, setMounted] = useState(false);
 
   // Filter and Search States
@@ -334,13 +339,15 @@ export default function CompaniesPage() {
             Directory of corporate profiles, technology sectors, and deal distributions.
           </p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add Company</span>
-        </button>
+        {canCreate && (
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Company</span>
+          </button>
+        )}
       </div>
 
       {/* Filters bar */}
@@ -387,7 +394,7 @@ export default function CompaniesPage() {
                 <th className="px-6 py-4">Technology Sector</th>
                 <th className="px-6 py-4">Employee Scale</th>
                 <th className="px-6 py-4">Active Pipeline Value</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                {(canUpdate || canDelete) && <th className="px-6 py-4 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-sm text-foreground">
@@ -434,29 +441,35 @@ export default function CompaniesPage() {
                         <span>{(company.dealValue || 0).toLocaleString()}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEditModal(company)}
-                          className="p-1.5 rounded-lg text-muted-foreground hover:text-indigo-400 hover:bg-indigo-500/10 transition-all cursor-pointer"
-                          aria-label="Edit Company"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCompany(company.id)}
-                          className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
-                          aria-label="Delete Company"
-                        >
-                          <Trash2 className="h-4.5 w-4.5" />
-                        </button>
-                      </div>
-                    </td>
+                    {(canUpdate || canDelete) && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {canUpdate && (
+                            <button
+                              onClick={() => openEditModal(company)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-indigo-400 hover:bg-indigo-500/10 transition-all cursor-pointer"
+                              aria-label="Edit Company"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => handleDeleteCompany(company.id)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
+                              aria-label="Delete Company"
+                            >
+                              <Trash2 className="h-4.5 w-4.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={(canUpdate || canDelete) ? 5 : 4} className="px-6 py-12 text-center text-muted-foreground">
                     No enterprise profiles matched search criteria.
                   </td>
                 </tr>

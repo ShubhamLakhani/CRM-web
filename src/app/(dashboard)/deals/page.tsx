@@ -20,6 +20,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dealsService, contactsService } from '@/services/api';
 import { useFeatures } from '@/hooks/useFeatures';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface DealActivity {
   id: string;
@@ -49,6 +50,10 @@ interface Deal {
 
 export default function DealsPage() {
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('deals.create');
+  const canUpdate = hasPermission('deals.update');
+  const canDelete = hasPermission('deals.delete');
   const [mounted, setMounted] = useState(false);
 
   // Modal and drawer controls
@@ -476,13 +481,15 @@ export default function DealsPage() {
             Native HTML5 Drag and Drop sales pipeline synced with backend engine.
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Launch Opportunity</span>
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Launch Opportunity</span>
+          </button>
+        )}
       </div>
 
       {/* AI forecast section (Premium AI feature flag check) */}
@@ -545,9 +552,9 @@ export default function DealsPage() {
           return (
             <div
               key={col.stage}
-              onDragOver={(e) => handleDragOver(e, col.stage)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, col.stage)}
+              onDragOver={canUpdate ? (e) => handleDragOver(e, col.stage) : undefined}
+              onDragLeave={canUpdate ? handleDragLeave : undefined}
+              onDrop={canUpdate ? (e) => handleDrop(e, col.stage) : undefined}
               className={`rounded-2xl border bg-card/65 backdrop-blur-sm p-4 flex flex-col gap-4 border-t-4 ${col.border} min-h-[450px] transition-all duration-200 ${
                 isHovered
                   ? 'border-indigo-500/50 ring-2 ring-indigo-500/20 bg-indigo-500/5 border-dashed border-2'
@@ -571,9 +578,9 @@ export default function DealsPage() {
                   colDeals.map((deal) => (
                     <div
                       key={deal.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, deal.id)}
-                      onDragEnd={handleDragEnd}
+                      draggable={canUpdate}
+                      onDragStart={canUpdate ? (e) => handleDragStart(e, deal.id) : undefined}
+                      onDragEnd={canUpdate ? handleDragEnd : undefined}
                       onClick={() => handleOpenDrawer(deal)}
                       className={`group relative rounded-xl border border-border bg-card p-4 shadow-sm hover:shadow-md transition-all duration-150 cursor-pointer ${
                         draggedDealId === deal.id ? 'opacity-40 border-dashed border-indigo-500/30' : ''
@@ -660,13 +667,15 @@ export default function DealsPage() {
                 <span className="text-sm font-bold text-foreground">Opportunity Pipeline Parameters</span>
               </div>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => handleDeleteDeal(selectedDealId)}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
-                  aria-label="Delete Deal"
-                >
-                  <Trash2 className="h-4.5 w-4.5" />
-                </button>
+                {canDelete && (
+                  <button
+                    onClick={() => handleDeleteDeal(selectedDealId)}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
+                    aria-label="Delete Deal"
+                  >
+                    <Trash2 className="h-4.5 w-4.5" />
+                  </button>
+                )}
                 <button
                   onClick={handleCloseDrawer}
                   className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-all cursor-pointer"
@@ -693,14 +702,15 @@ export default function DealsPage() {
                       <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Deal Title</label>
                       <input
                         type="text"
+                        disabled={!canUpdate}
                         value={drawerTitle}
                         onChange={(e) => setDrawerTitle(e.target.value)}
                         onBlur={() => {
-                          if (drawerTitle.trim() && drawerTitle !== selectedDeal.title) {
+                          if (canUpdate && drawerTitle.trim() && drawerTitle !== selectedDeal.title) {
                             handleUpdateDrawerField('title', drawerTitle.trim());
                           }
                         }}
-                        className="w-full text-lg font-bold text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-indigo-500 outline-none transition-colors"
+                        className="w-full text-lg font-bold text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-indigo-500 outline-none transition-colors disabled:hover:border-transparent disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -715,15 +725,18 @@ export default function DealsPage() {
                           <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                           <input
                             type="number"
+                            disabled={!canUpdate}
                             value={drawerValue}
                             onChange={(e) => setDrawerValue(e.target.value)}
                             onBlur={() => {
-                              const numVal = parseFloat(drawerValue) || 0;
-                              if (numVal !== selectedDeal.value) {
-                                handleUpdateDrawerField('value', numVal);
+                              if (canUpdate) {
+                                const numVal = parseFloat(drawerValue) || 0;
+                                if (numVal !== selectedDeal.value) {
+                                  handleUpdateDrawerField('value', numVal);
+                                }
                               }
                             }}
-                            className="w-full text-xs font-bold text-foreground bg-transparent border border-transparent hover:border-border focus:border-indigo-500/50 py-1.5 pl-7 pr-2 rounded-lg outline-none transition-all"
+                            className="w-full text-xs font-bold text-foreground bg-transparent border border-transparent hover:border-border focus:border-indigo-500/50 py-1.5 pl-7 pr-2 rounded-lg outline-none transition-all disabled:hover:border-transparent disabled:cursor-not-allowed"
                           />
                         </div>
                       </div>
@@ -731,13 +744,14 @@ export default function DealsPage() {
                       <div className="space-y-1">
                         <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Current Stage</label>
                         <select
+                          disabled={!canUpdate}
                           value={drawerStage}
                           onChange={(e) => {
                             const val = e.target.value as any;
                             setDrawerStage(val);
                             handleUpdateDrawerField('stage', val);
                           }}
-                          className="w-full text-xs font-bold text-foreground bg-card border border-border rounded-lg py-1.5 px-2 outline-none focus:border-indigo-500/50 transition-all cursor-pointer"
+                          className="w-full text-xs font-bold text-foreground bg-card border border-border rounded-lg py-1.5 px-2 outline-none focus:border-indigo-500/50 transition-all cursor-pointer disabled:cursor-not-allowed"
                         >
                           <option value="LEAD">Lead</option>
                           <option value="CONTACTED">Contacted</option>
@@ -751,13 +765,14 @@ export default function DealsPage() {
                       <div className="space-y-1 sm:col-span-2">
                         <label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">Linked Contact</label>
                         <select
+                          disabled={!canUpdate}
                           value={drawerContactId}
                           onChange={(e) => {
                             const val = e.target.value || null;
                             setDrawerContactId(val || '');
                             handleUpdateDrawerField('contactId', val);
                           }}
-                          className="w-full text-xs font-bold text-foreground bg-card border border-border rounded-lg py-1.5 px-2 outline-none focus:border-indigo-500/50 transition-all cursor-pointer"
+                          className="w-full text-xs font-bold text-foreground bg-card border border-border rounded-lg py-1.5 px-2 outline-none focus:border-indigo-500/50 transition-all cursor-pointer disabled:cursor-not-allowed"
                         >
                           <option value="">Independent Lead (No Linked Contact)</option>
                           {contacts.map((c: any) => (
@@ -775,22 +790,24 @@ export default function DealsPage() {
                     <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">Internal Log History</h3>
 
                     {/* Add note inside drawer */}
-                    <form onSubmit={handleAddDrawerNote} className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Log a new detail note..."
-                        value={newNoteText}
-                        onChange={(e) => setNewNoteText(e.target.value)}
-                        className="flex-1 rounded-xl border border-border bg-secondary/20 py-2 px-3 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50 transition-all"
-                      />
-                      <button
-                        type="submit"
-                        disabled={addNoteMutation.isPending}
-                        className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-2 text-xs transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        {addNoteMutation.isPending ? 'Logging...' : 'Log Note'}
-                      </button>
-                    </form>
+                    {canUpdate && (
+                      <form onSubmit={handleAddDrawerNote} className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Log a new detail note..."
+                          value={newNoteText}
+                          onChange={(e) => setNewNoteText(e.target.value)}
+                          className="flex-1 rounded-xl border border-border bg-secondary/20 py-2 px-3 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50 transition-all"
+                        />
+                        <button
+                          type="submit"
+                          disabled={addNoteMutation.isPending}
+                          className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-2 text-xs transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {addNoteMutation.isPending ? 'Logging...' : 'Log Note'}
+                        </button>
+                      </form>
+                    )}
 
                     {/* Timeline Feed list */}
                     <div className="relative border-l border-border/80 pl-6 ml-3.5 space-y-4">
