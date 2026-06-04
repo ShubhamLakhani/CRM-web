@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dealsService, contactsService } from '@/services/api';
+import { useFeatures } from '@/hooks/useFeatures';
 
 interface DealActivity {
   id: string;
@@ -88,6 +89,16 @@ export default function DealsPage() {
   });
 
   const contacts = useMemo(() => contactsQuery.data?.data || [], [contactsQuery.data]);
+
+  const { isFeatureEnabled } = useFeatures();
+  const isAiEnabled = isFeatureEnabled('AI_ASSISTANT');
+
+  const aiForecastQuery = useQuery({
+    queryKey: ['ai-forecast'],
+    queryFn: () => dealsService.getAiForecast(),
+    enabled: mounted && isAiEnabled,
+    staleTime: 10 * 60 * 1000,
+  });
 
   // 3. Fetch single deal details (includes activities) when drawer is open
   const dealDetailsQuery = useQuery<Deal>({
@@ -473,6 +484,56 @@ export default function DealsPage() {
           <span>Launch Opportunity</span>
         </button>
       </div>
+
+      {/* AI forecast section (Premium AI feature flag check) */}
+      {isAiEnabled && (
+        <div className="rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/10 via-violet-500/5 to-transparent p-5 shadow-lg relative overflow-hidden backdrop-blur-sm group hover:border-indigo-500/35 transition-all duration-300">
+          <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl group-hover:scale-150 transition-all duration-700" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:scale-110 transition-transform duration-300">
+                <Sparkles className="h-5 w-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <span>AI Copilot Forecast</span>
+                  <span className="text-[9px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded px-1.5 py-0.5 uppercase tracking-wider">Active</span>
+                </h3>
+                {aiForecastQuery.isLoading ? (
+                  <div className="space-y-2 mt-2">
+                    <div className="h-3 w-72 bg-secondary/60 rounded animate-pulse" />
+                    <div className="h-3 w-48 bg-secondary/60 rounded animate-pulse" />
+                  </div>
+                ) : aiForecastQuery.isError ? (
+                  <p className="text-xs text-rose-400 mt-1.5 font-medium flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    <span>Failed to retrieve AI insights. Verify your workspace credentials.</span>
+                  </p>
+                ) : (
+                  <div className="mt-1.5 space-y-1">
+                    <p className="text-xs text-muted-foreground leading-relaxed max-w-3xl font-medium">
+                      {aiForecastQuery.data?.forecast}
+                    </p>
+                    <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-semibold pt-1">
+                      <span className="flex items-center gap-1">
+                        Predictive Confidence: <span className="text-indigo-400 font-bold">{(aiForecastQuery.data?.confidenceScore * 100).toFixed(0)}%</span>
+                      </span>
+                      <span>•</span>
+                      <span>Synced {aiForecastQuery.data?.updatedAt ? new Date(aiForecastQuery.data.updatedAt).toLocaleTimeString() : ''}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => aiForecastQuery.refetch()}
+              className="flex-shrink-0 flex items-center gap-1 text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors bg-indigo-500/5 hover:bg-indigo-500/10 border border-indigo-500/10 hover:border-indigo-500/20 px-3 py-1.5 rounded-xl cursor-pointer"
+            >
+              <span>Refresh Insights</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Kanban staging columns grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-5 items-start select-none">

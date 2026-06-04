@@ -115,8 +115,8 @@ export const authService = {
     const res = await apiClient.get('/auth/me');
     return res.data;
   },
-  refresh: async () => {
-    const res = await apiClient.post('/auth/refresh');
+  refresh: async (organizationId?: string) => {
+    const res = await apiClient.post('/auth/refresh', { organizationId });
     return res.data;
   },
   logout: async () => {
@@ -129,6 +129,62 @@ export const authService = {
   },
   getUsers: async () => {
     const res = await apiClient.get('/auth/users');
+    return res.data;
+  },
+};
+
+// Invitations Services
+export const invitationsService = {
+  getPending: async () => {
+    const res = await apiClient.get('/invitations');
+    return res.data;
+  },
+  invite: async (data: { email: string; roleId: string }) => {
+    const res = await apiClient.post('/invitations', data);
+    return res.data;
+  },
+  resend: async (id: string) => {
+    const res = await apiClient.post(`/invitations/${id}/resend`);
+    return res.data;
+  },
+  revoke: async (id: string) => {
+    const res = await apiClient.delete(`/invitations/${id}`);
+    return res.data;
+  },
+  accept: async (token: string) => {
+    const res = await apiClient.post('/invitations/accept', { token });
+    return res.data;
+  },
+  validate: async (token: string) => {
+    const res = await apiClient.get('/invitations/validate', { params: { token } });
+    return res.data;
+  },
+  registerAndAccept: async (data: { token: string; name: string; password: string }) => {
+    const res = await apiClient.post('/invitations/register-and-accept', data);
+    return res.data;
+  },
+};
+
+// Organizations Services
+export const organizationsService = {
+  getMyOrganizations: async () => {
+    const res = await apiClient.get('/organizations/my-organizations');
+    return res.data;
+  },
+  switch: async (organizationId: string) => {
+    const res = await apiClient.post('/organizations/switch', { organizationId });
+    return res.data;
+  },
+};
+
+// Features Services
+export const featuresService = {
+  getFeatures: async () => {
+    const res = await apiClient.get('/features');
+    return res.data;
+  },
+  toggleFeature: async (featureId: string, isEnabled: boolean) => {
+    const res = await apiClient.patch(`/features/${featureId}`, { isEnabled });
     return res.data;
   },
 };
@@ -190,6 +246,10 @@ export const dealsService = {
   },
   addNote: async (id: string, description: string) => {
     const res = await apiClient.post(`/deals/${id}/notes`, { description });
+    return res.data;
+  },
+  getAiForecast: async () => {
+    const res = await apiClient.get('/deals/ai/forecast');
     return res.data;
   },
 };

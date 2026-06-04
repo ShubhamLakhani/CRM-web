@@ -2,13 +2,18 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { authService, setMemoryToken } from '../services/api';
+import { authService, invitationsService, setMemoryToken } from '../services/api';
 
 interface User {
   id: string;
   email: string;
   name: string;
   role: string;
+  organizationId: string;
+  organizationName?: string;
+  activeOrganizationId?: string;
+  activeOrganizationRole?: string;
+  permissions?: string[];
 }
 
 interface AuthContextType {
@@ -19,6 +24,7 @@ interface AuthContextType {
   login: (credentials: any) => Promise<void>;
   register: (profile: any) => Promise<void>;
   logout: () => void;
+  syncSession: (data: { user: any; accessToken: string }) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -59,9 +65,17 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           setUser(data.user);
           localStorage.setItem('apex-user', JSON.stringify(data.user));
 
-          // If they land on login page but have a valid session, go to dashboard
+          // If they land on login page but have a valid session, go to dashboard or callbackUrl
           if (pathname.startsWith('/login')) {
-            router.replace('/dashboard');
+            let redirectUrl = '/dashboard';
+            if (typeof window !== 'undefined') {
+              const urlParams = new URLSearchParams(window.location.search);
+              const callback = urlParams.get('callbackUrl');
+              if (callback) {
+                redirectUrl = callback;
+              }
+            }
+            router.replace(redirectUrl);
           }
         } catch (error) {
           console.error('Session restoration failed:', error);
@@ -70,7 +84,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         }
       } else {
         // No session user, redirect if on protected route
-        if (!pathname.startsWith('/login')) {
+        if (!pathname.startsWith('/login') && !pathname.startsWith('/invite/accept')) {
           router.replace('/login');
         }
       }
@@ -90,11 +104,49 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     setIsLoading(true);
     try {
       const data = await authService.login(credentials);
-      setMemoryToken(data.accessToken);
-      setAccessToken(data.accessToken);
-      setUser(data.user);
-      localStorage.setItem('apex-user', JSON.stringify(data.user));
-      router.replace('/dashboard');
+      let activeUser = data.user;
+      let activeToken = data.accessToken;
+
+      // Check if we have a pending inviteToken in the URL context
+      let inviteToken: string | null = null;
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        inviteToken = urlParams.get('inviteToken');
+      }
+
+      if (inviteToken) {
+        try {
+          // Set temporary token to authenticate the accept request
+          setMemoryToken(data.accessToken);
+          
+          // Accept the invitation
+          const acceptRes = await invitationsService.accept(inviteToken);
+          
+          // Switch organization context immediately
+          const refreshData = await authService.refresh(acceptRes.organizationId);
+          activeUser = refreshData.user;
+          activeToken = refreshData.accessToken;
+        } catch (err) {
+          console.error('Failed to accept invitation after login:', err);
+        }
+      }
+
+      setMemoryToken(activeToken);
+      setAccessToken(activeToken);
+      setUser(activeUser);
+      localStorage.setItem('apex-user', JSON.stringify(activeUser));
+
+      if (!pathname.startsWith('/invite/accept')) {
+        let redirectUrl = '/dashboard';
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const callback = urlParams.get('callbackUrl');
+          if (callback) {
+            redirectUrl = callback;
+          }
+        }
+        router.replace(redirectUrl);
+      }
     } catch (error) {
       setMemoryToken(null);
       setAccessToken(null);
@@ -114,7 +166,17 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       setAccessToken(data.accessToken);
       setUser(data.user);
       localStorage.setItem('apex-user', JSON.stringify(data.user));
-      router.replace('/dashboard');
+      if (!pathname.startsWith('/invite/accept')) {
+        let redirectUrl = '/dashboard';
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const callback = urlParams.get('callbackUrl');
+          if (callback) {
+            redirectUrl = callback;
+          }
+        }
+        router.replace(redirectUrl);
+      }
     } catch (error) {
       setMemoryToken(null);
       setAccessToken(null);
@@ -137,6 +199,13 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     router.replace('/login');
   };
 
+  const syncSession = (data: { user: any; accessToken: string }) => {
+    setMemoryToken(data.accessToken);
+    setAccessToken(data.accessToken);
+    setUser(data.user);
+    localStorage.setItem('apex-user', JSON.stringify(data.user));
+  };
+
   const value = {
     user,
     accessToken,
@@ -145,6 +214,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     login,
     register,
     logout,
+    syncSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

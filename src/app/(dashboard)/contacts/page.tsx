@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contactsService } from '@/services/api';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface ContactActivity {
   id: string;
@@ -65,6 +66,9 @@ interface Contact {
 
 export default function ContactsPage() {
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission('contacts.create');
+  const canDelete = hasPermission('contacts.delete');
 
   // UI Control states
   const [searchQuery, setSearchQuery] = useState('');
@@ -529,13 +533,15 @@ export default function ContactsPage() {
             Sleek database grid for customer properties, pipelines, and audit histories.
           </p>
         </div>
-        <button
-          onClick={() => setCreateModalOpen(true)}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add Lead</span>
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Lead</span>
+          </button>
+        )}
       </div>
 
       {/* Control filters bar */}
@@ -696,17 +702,19 @@ export default function ContactsPage() {
                 <span className="text-sm font-bold text-foreground">Lead Profile Details</span>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (confirm(`Are you sure you want to delete ${selectedContact.name}?`)) {
-                      deleteContactMutation.mutate(selectedContact.id);
-                    }
-                  }}
-                  className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all cursor-pointer mr-1"
-                  title="Delete Contact"
-                >
-                  <Trash2 className="h-4.5 w-4.5" />
-                </button>
+                {canDelete && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to delete ${selectedContact.name}?`)) {
+                        deleteContactMutation.mutate(selectedContact.id);
+                      }
+                    }}
+                    className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-all cursor-pointer mr-1"
+                    title="Delete Contact"
+                  >
+                    <Trash2 className="h-4.5 w-4.5" />
+                  </button>
+                )}
                 <button
                   onClick={handleCloseDrawer}
                   className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-all cursor-pointer"
