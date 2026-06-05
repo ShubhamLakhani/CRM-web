@@ -351,3 +351,39 @@ export const notificationsService = {
     return res.data;
   },
 };
+
+// Audit Logs Services
+export const auditLogsService = {
+  getAll: async (params?: {
+    search?: string;
+    entityType?: string;
+    action?: string;
+    actorId?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const res = await apiClient.get('/audit-logs', { params });
+    return res.data;
+  },
+  getOne: async (id: string) => {
+    const res = await apiClient.get(`/audit-logs/${id}`);
+    return res.data;
+  },
+  export: async (params?: {
+    search?: string;
+    entityType?: string;
+    action?: string;
+    actorId?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const res = await apiClient.get('/audit-logs/export', {
+      params,
+      responseType: 'blob',
+    });
+    return res.data;
+  },
+};
+

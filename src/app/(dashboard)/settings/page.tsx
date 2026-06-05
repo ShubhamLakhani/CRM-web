@@ -26,13 +26,16 @@ import {
 } from 'lucide-react';
 
 import { usePermissions } from '../../../hooks/usePermissions';
+import AuditLogCenter from '../../../components/AuditLogCenter';
+
 
 export default function SettingsPage() {
   const { theme, toggleTheme } = useCRMStore();
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
-  const [activeTab, setActiveTab] = useState<'general' | 'team' | 'features'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'team' | 'features' | 'audit'>('general');
   const canManageFeatures = hasPermission('billing.manage');
+  const canViewAudit = hasPermission('audit.view');
   const canInvite = hasPermission('users.invite');
 
   // Team management state
@@ -187,6 +190,19 @@ export default function SettingsPage() {
             <Shield className="h-4.5 w-4.5 text-indigo-500" />
             <span>Features</span>
           </button>
+          {canViewAudit && (
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-left transition-all ${
+                activeTab === 'audit'
+                  ? 'bg-secondary text-foreground'
+                  : 'text-muted-foreground hover:bg-muted/10 hover:text-foreground'
+              }`}
+            >
+              <Server className="h-4.5 w-4.5 text-indigo-500" />
+              <span>Audit Logs</span>
+            </button>
+          )}
         </div>
 
         {/* Configurations Fields / Tabs */}
@@ -613,6 +629,9 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+          )}
+          {activeTab === 'audit' && (
+            <AuditLogCenter />
           )}
         </div>
       </div>
