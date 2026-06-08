@@ -387,3 +387,22 @@ export const auditLogsService = {
   },
 };
 
+// Subscription Services
+export const subscriptionService = {
+  getCurrent: async () => {
+    const res = await apiClient.get('/subscription/current');
+    return res.data;
+  },
+  getUsage: async () => {
+    const res = await apiClient.get('/subscription/usage');
+    return res.data;
+  },
+  getPlans: async () => {
+    const res = await apiClient.get('/subscription/plans');
+    return res.data;
+  },
+  changePlan: async (planId: string) => {
+    const res = await apiClient.post('/subscription/change-plan', { planId });
+    return res.data;
+  },
+};

@@ -22,19 +22,22 @@ import {
   RefreshCw,
   Copy,
   Check,
-  AlertCircle
+  AlertCircle,
+  CreditCard
 } from 'lucide-react';
 
 import { usePermissions } from '../../../hooks/usePermissions';
 import AuditLogCenter from '../../../components/AuditLogCenter';
+import BillingCenter from '../../../components/BillingCenter';
 
 
 export default function SettingsPage() {
   const { theme, toggleTheme } = useCRMStore();
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
-  const [activeTab, setActiveTab] = useState<'general' | 'team' | 'features' | 'audit'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'team' | 'features' | 'audit' | 'billing'>('general');
   const canManageFeatures = hasPermission('billing.manage');
+  const canManageBilling = hasPermission('billing.manage');
   const canViewAudit = hasPermission('audit.view');
   const canInvite = hasPermission('users.invite');
 
@@ -190,6 +193,19 @@ export default function SettingsPage() {
             <Shield className="h-4.5 w-4.5 text-indigo-500" />
             <span>Features</span>
           </button>
+          {canManageBilling && (
+            <button
+              onClick={() => setActiveTab('billing')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-left transition-all ${
+                activeTab === 'billing'
+                  ? 'bg-secondary text-foreground'
+                  : 'text-muted-foreground hover:bg-muted/10 hover:text-foreground'
+              }`}
+            >
+              <CreditCard className="h-4.5 w-4.5 text-indigo-500" />
+              <span>Billing</span>
+            </button>
+          )}
           {canViewAudit && (
             <button
               onClick={() => setActiveTab('audit')}
@@ -629,6 +645,9 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+          )}
+          {activeTab === 'billing' && canManageBilling && (
+            <BillingCenter />
           )}
           {activeTab === 'audit' && (
             <AuditLogCenter />
