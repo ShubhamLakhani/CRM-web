@@ -42,6 +42,7 @@ export default function Sidebar({ onClose, onSearchClick }: SidebarProps) {
     { name: 'Companies', href: '/companies', icon: Building },
     { name: 'Deals Pipeline', href: '/deals', icon: Briefcase },
     { name: 'Tasks Manager', href: '/tasks', icon: CheckSquare },
+    { name: 'Automations', href: '/automations', icon: Zap },
     { name: 'Activity Feed', href: '/activity', icon: Clock },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];

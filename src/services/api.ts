@@ -406,3 +406,38 @@ export const subscriptionService = {
     return res.data;
   },
 };
+
+export const automationsService = {
+  getMetadata: async () => {
+    const res = await apiClient.get('/automations/metadata');
+    return res.data;
+  },
+  getAll: async () => {
+    const res = await apiClient.get('/automations');
+    return res.data;
+  },
+  getOne: async (id: string) => {
+    const res = await apiClient.get(`/automations/${id}`);
+    return res.data;
+  },
+  create: async (data: any) => {
+    const res = await apiClient.post('/automations', data);
+    return res.data;
+  },
+  update: async (id: string, data: any) => {
+    const res = await apiClient.patch(`/automations/${id}`, data);
+    return res.data;
+  },
+  delete: async (id: string) => {
+    const res = await apiClient.delete(`/automations/${id}`);
+    return res.data;
+  },
+  findExecutions: async (params?: { ruleId?: string; status?: string; page?: number; limit?: number }) => {
+    const res = await apiClient.get('/automations/executions', { params });
+    return res.data;
+  },
+  getStats: async (ruleId?: string) => {
+    const res = await apiClient.get('/automations/stats', { params: { ruleId } });
+    return res.data;
+  },
+};
