@@ -62,6 +62,8 @@ export default function TasksPage() {
   // Search and status filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form states
@@ -81,15 +83,50 @@ export default function TasksPage() {
 
   // 1. Fetch active tasks matching search/filters
   const tasksQuery = useQuery<Task[]>({
-    queryKey: ['tasks', search, statusFilter],
-    queryFn: () => tasksService.getAll(search, statusFilter),
+    queryKey: ['tasks'],
+    queryFn: () => tasksService.getAll(),
   });
 
-  const tasks = useMemo(() => tasksQuery.data || [], [tasksQuery.data]);
+  const rawTasks = useMemo(() => tasksQuery.data || [], [tasksQuery.data]);
+
+  // Apply filters client-side (except statusFilter for column grouping)
+  const filteredTasks = useMemo(() => {
+    return rawTasks.filter((task) => {
+      // 1. Search term (title or description)
+      if (search) {
+        const query = search.toLowerCase();
+        const matchesTitle = task.title?.toLowerCase().includes(query);
+        const matchesDesc = (task as any).description?.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesDesc) {
+          return false;
+        }
+      }
+
+      // 2. Assignee filter
+      if (assigneeFilter && task.assigneeId !== assigneeFilter) {
+        return false;
+      }
+
+      // 3. Priority filter
+      if (priorityFilter && task.priority !== priorityFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [rawTasks, search, assigneeFilter, priorityFilter]);
+
+  // Tasks to display (which also respects statusFilter)
+  const tasks = useMemo(() => {
+    if (statusFilter) {
+      return filteredTasks.filter((t) => t.status === statusFilter);
+    }
+    return filteredTasks;
+  }, [filteredTasks, statusFilter]);
 
   useEffect(() => {
-    if (taskIdParam && tasks.length > 0) {
-      const found = tasks.find((t) => t.id === taskIdParam);
+    if (taskIdParam && rawTasks.length > 0) {
+      const found = rawTasks.find((t) => t.id === taskIdParam);
       if (found) {
         handleOpenDrawer(found);
       } else {
@@ -103,7 +140,7 @@ export default function TasksPage() {
           .catch((err) => console.error('Failed to load deep-linked task', err));
       }
     }
-  }, [taskIdParam, tasks]);
+  }, [taskIdParam, rawTasks]);
 
   // 2. Fetch organization users to populate assignee selection list
   const usersQuery = useQuery<any[]>({
@@ -126,8 +163,8 @@ export default function TasksPage() {
   const createTaskMutation = useMutation({
     mutationFn: (newTask: any) => tasksService.create(newTask),
     onMutate: async (newTask) => {
-      await queryClient.cancelQueries({ queryKey: ['tasks', search, statusFilter] });
-      const previousTasks = queryClient.getQueryData<Task[]>(['tasks', search, statusFilter]) || [];
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      const previousTasks = queryClient.getQueryData<Task[]>(['tasks']) || [];
 
       const assignedUser = users.find((u: any) => u.id === newTask.assigneeId);
 
@@ -142,11 +179,11 @@ export default function TasksPage() {
         createdAt: new Date().toISOString(),
       };
 
-      queryClient.setQueryData<Task[]>(['tasks', search, statusFilter], [optimisticTask, ...previousTasks]);
+      queryClient.setQueryData<Task[]>(['tasks'], [optimisticTask, ...previousTasks]);
       return { previousTasks };
     },
     onError: (err, newTask, context) => {
-      queryClient.setQueryData(['tasks', search, statusFilter], context?.previousTasks);
+      queryClient.setQueryData(['tasks'], context?.previousTasks);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -157,10 +194,10 @@ export default function TasksPage() {
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => tasksService.update(id, data),
     onMutate: async ({ id, data }) => {
-      await queryClient.cancelQueries({ queryKey: ['tasks', search, statusFilter] });
-      const previousTasks = queryClient.getQueryData<Task[]>(['tasks', search, statusFilter]);
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      const previousTasks = queryClient.getQueryData<Task[]>(['tasks']);
 
-      queryClient.setQueryData<Task[]>(['tasks', search, statusFilter], (old) => {
+      queryClient.setQueryData<Task[]>(['tasks'], (old) => {
         if (!old) return [];
         return old.map((t) => {
           if (t.id === id) {
@@ -178,7 +215,7 @@ export default function TasksPage() {
       return { previousTasks };
     },
     onError: (err, variables, context) => {
-      queryClient.setQueryData(['tasks', search, statusFilter], context?.previousTasks);
+      queryClient.setQueryData(['tasks'], context?.previousTasks);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -189,10 +226,10 @@ export default function TasksPage() {
   const deleteTaskMutation = useMutation({
     mutationFn: (id: string) => tasksService.delete(id),
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ['tasks', search, statusFilter] });
-      const previousTasks = queryClient.getQueryData<Task[]>(['tasks', search, statusFilter]);
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      const previousTasks = queryClient.getQueryData<Task[]>(['tasks']);
 
-      queryClient.setQueryData<Task[]>(['tasks', search, statusFilter], (old) => {
+      queryClient.setQueryData<Task[]>(['tasks'], (old) => {
         if (!old) return [];
         return old.filter((t) => t.id !== id);
       });
@@ -200,7 +237,7 @@ export default function TasksPage() {
       return { previousTasks };
     },
     onError: (err, id, context) => {
-      queryClient.setQueryData(['tasks', search, statusFilter], context?.previousTasks);
+      queryClient.setQueryData(['tasks'], context?.previousTasks);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -419,22 +456,62 @@ export default function TasksPage() {
           />
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <span className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
-            Filter Status
-          </span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full md:w-44 rounded-xl border border-border bg-card py-2.5 px-3 text-sm text-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all cursor-pointer"
-          >
-            <option value="">All Tasks</option>
-            <option value="BACKLOG">Backlog</option>
-            <option value="TODO">To Do</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="DONE">Completed</option>
-            <option value="CANCELED">Canceled</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+          {/* Assignee Filter */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
+              Assignee
+            </span>
+            <select
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value)}
+              className="w-full sm:w-44 rounded-xl border border-border bg-card py-2.5 px-3 text-sm text-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all cursor-pointer"
+            >
+              <option value="">All Assignees</option>
+              {users.map((user: any) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Priority Filter */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
+              Priority
+            </span>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="w-full sm:w-44 rounded-xl border border-border bg-card py-2.5 px-3 text-sm text-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all cursor-pointer"
+            >
+              <option value="">All Priorities</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+              <option value="NONE">None</option>
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
+              Status
+            </span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full sm:w-44 rounded-xl border border-border bg-card py-2.5 px-3 text-sm text-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all cursor-pointer"
+            >
+              <option value="">All Tasks</option>
+              <option value="BACKLOG">Backlog</option>
+              <option value="TODO">To Do</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="DONE">Completed</option>
+              <option value="CANCELED">Canceled</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -676,7 +753,28 @@ export default function TasksPage() {
                 <div className="grid grid-cols-3 gap-4 pt-2 border-t border-border/40 text-xs">
                   <div>
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block mb-0.5">Status</span>
-                    <span className="font-semibold text-foreground">{selectedTask.status}</span>
+                    <select
+                      value={selectedTask.status}
+                      disabled={!canUpdate}
+                      onChange={(e) => {
+                        const newStatus = e.target.value as Task['status'];
+                        updateTaskMutation.mutate(
+                          { id: selectedTask.id, data: { status: newStatus } },
+                          {
+                            onSuccess: () => {
+                              setSelectedTask((prev) => prev ? { ...prev, status: newStatus } : null);
+                            }
+                          }
+                        );
+                      }}
+                      className="w-full rounded-lg border border-border bg-secondary/30 py-1.5 px-2 text-xs font-semibold text-foreground outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all cursor-pointer"
+                    >
+                      <option value="BACKLOG">Backlog</option>
+                      <option value="TODO">To Do</option>
+                      <option value="IN_PROGRESS">In Progress</option>
+                      <option value="DONE">Completed</option>
+                      <option value="CANCELED">Canceled</option>
+                    </select>
                   </div>
                   <div>
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground block mb-0.5">Priority</span>
