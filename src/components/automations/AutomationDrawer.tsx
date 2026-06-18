@@ -274,6 +274,7 @@ export default function AutomationDrawer({
                   actions={actions}
                   onChange={setActions}
                   actionTypesMetadata={metadata.actionTypes}
+                  organizationUsers={metadata.organizationUsers}
                 />
               </div>
             </div>

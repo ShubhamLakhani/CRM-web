@@ -30,13 +30,55 @@ interface ActionsBuilderProps {
   actions: Action[];
   onChange: (actions: Action[]) => void;
   actionTypesMetadata: ActionType[];
+  organizationUsers?: Array<{ id: string; name: string; email: string }>;
 }
 
 export default function ActionsBuilder({
   actions,
   onChange,
   actionTypesMetadata,
+  organizationUsers,
 }: ActionsBuilderProps) {
+  const renderSelectOptions = (f: ActionField) => {
+    if (f.name === 'assigneeId' || f.name === 'userId' || f.name === 'to') {
+      const dynamicOptions = f.options || [];
+      return (
+        <>
+          <optgroup label="Dynamic Recipients">
+            {dynamicOptions.map((opt) => {
+              const valStr = typeof opt === 'object' ? opt.value : opt;
+              const lblStr = typeof opt === 'object' ? opt.label : opt;
+              return (
+                <option key={valStr} value={valStr}>
+                  {lblStr}
+                </option>
+              );
+            })}
+          </optgroup>
+          {organizationUsers && organizationUsers.length > 0 && (
+            <optgroup label="Organization Members">
+              {organizationUsers.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+        </>
+      );
+    }
+
+    return f.options?.map((opt) => {
+      const valStr = typeof opt === 'object' ? opt.value : opt;
+      const lblStr = typeof opt === 'object' ? opt.label : opt;
+      return (
+        <option key={valStr} value={valStr}>
+          {lblStr}
+        </option>
+      );
+    });
+  };
+
   const handleAddAction = () => {
     const defaultType = actionTypesMetadata[0]?.value || '';
     const config: Record<string, any> = {};
@@ -172,6 +214,9 @@ export default function ActionsBuilder({
                     {fields.map((f) => {
                       const value = act.configurationJson[f.name] ?? '';
                       const isFullWidth = f.name === 'description' || f.name === 'body' || f.name === 'message';
+                      const isDropdownOption = f.options?.some(
+                        (opt) => (typeof opt === 'object' ? opt.value : opt) === value
+                      ) || organizationUsers?.some(u => u.id === value);
 
                       return (
                         <div
@@ -228,15 +273,7 @@ export default function ActionsBuilder({
                               onChange={(e) => handleFieldChange(index, f.name, e.target.value)}
                               className="w-full rounded-xl border border-border bg-secondary/20 py-2.5 px-3 text-xs text-foreground outline-none focus:border-indigo-500/50 transition-all cursor-pointer"
                             >
-                              {f.options?.map((opt) => {
-                                const valStr = typeof opt === 'object' ? opt.value : opt;
-                                const lblStr = typeof opt === 'object' ? opt.label : opt;
-                                return (
-                                  <option key={valStr} value={valStr}>
-                                    {lblStr}
-                                  </option>
-                                );
-                              })}
+                              {renderSelectOptions(f)}
                             </select>
                           ) : null}
 
@@ -248,15 +285,7 @@ export default function ActionsBuilder({
                               onChange={(e) => handleFieldChange(index, f.name, e.target.value)}
                               className="w-full rounded-xl border border-border bg-secondary/20 py-2.5 px-3 text-xs text-foreground outline-none focus:border-indigo-500/50 transition-all cursor-pointer"
                             >
-                              {f.options?.map((opt) => {
-                                const valStr = typeof opt === 'object' ? opt.value : opt;
-                                const lblStr = typeof opt === 'object' ? opt.label : opt;
-                                return (
-                                  <option key={valStr} value={valStr}>
-                                    {lblStr}
-                                  </option>
-                                );
-                              })}
+                              {renderSelectOptions(f)}
                             </select>
                           ) : null}
 
@@ -265,13 +294,7 @@ export default function ActionsBuilder({
                             <div className="flex gap-2">
                               {/* Option selection */}
                               <select
-                                value={
-                                  f.options?.some(
-                                    (opt) => (typeof opt === 'object' ? opt.value : opt) === value
-                                  )
-                                    ? value
-                                    : 'CUSTOM'
-                                }
+                                value={isDropdownOption ? value : 'CUSTOM'}
                                 onChange={(e) => {
                                   const selectVal = e.target.value;
                                   if (selectVal !== 'CUSTOM') {
@@ -282,32 +305,16 @@ export default function ActionsBuilder({
                                 }}
                                 className="rounded-xl border border-border bg-secondary/20 py-2.5 px-3 text-xs text-foreground outline-none focus:border-indigo-500/50 transition-all cursor-pointer w-44"
                               >
-                                {f.options?.map((opt) => {
-                                  const valStr = typeof opt === 'object' ? opt.value : opt;
-                                  const lblStr = typeof opt === 'object' ? opt.label : opt;
-                                  return (
-                                    <option key={valStr} value={valStr}>
-                                      {lblStr}
-                                    </option>
-                                  );
-                                })}
+                                {renderSelectOptions(f)}
                                 <option value="CUSTOM">Custom Address...</option>
                               </select>
 
                               {/* Custom input string if option selected is custom */}
-                              {!f.options?.some(
-                                (opt) => (typeof opt === 'object' ? opt.value : opt) === value
-                              ) || value === '' ? (
+                              {!isDropdownOption || value === '' ? (
                                 <input
                                   type="text"
                                   required={f.required}
-                                  value={
-                                    f.options?.some(
-                                      (opt) => (typeof opt === 'object' ? opt.value : opt) === value
-                                    )
-                                      ? ''
-                                      : value
-                                  }
+                                  value={isDropdownOption ? '' : value}
                                   onChange={(e) =>
                                     handleFieldChange(index, f.name, e.target.value)
                                   }
