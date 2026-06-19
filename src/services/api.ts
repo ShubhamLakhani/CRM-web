@@ -440,4 +440,16 @@ export const automationsService = {
     const res = await apiClient.get('/automations/stats', { params: { ruleId } });
     return res.data;
   },
+  getTemplates: async () => {
+    const res = await apiClient.get('/automations/templates');
+    return res.data;
+  },
+  getTemplateById: async (id: string) => {
+    const res = await apiClient.get(`/automations/templates/${id}`);
+    return res.data;
+  },
+  instantiateTemplate: async (id: string, data?: any) => {
+    const res = await apiClient.post(`/automations/templates/${id}/instantiate`, data);
+    return res.data;
+  },
 };

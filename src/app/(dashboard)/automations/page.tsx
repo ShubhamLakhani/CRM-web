@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Zap, Plus, AlertTriangle, ShieldCheck, CreditCard } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Zap, Plus, AlertTriangle, ShieldCheck, CreditCard, ArrowLeft } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { automationsService, subscriptionService } from '@/services/api';
 import { useAuth } from '@/providers/AuthProvider';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -13,6 +13,8 @@ import AutomationDrawer from '@/components/automations/AutomationDrawer';
 import StatsDashboard from '@/components/automations/StatsDashboard';
 import ExecutionLogsTable from '@/components/automations/ExecutionLogsTable';
 import RulesListSkeleton from '@/components/automations/RulesListSkeleton';
+import TemplatesLibrary, { AutomationTemplate } from '@/components/automations/TemplatesLibrary';
+import TemplatePreviewModal from '@/components/automations/TemplatePreviewModal';
 
 export default function AutomationsPage() {
   const { user } = useAuth();
@@ -28,6 +30,10 @@ export default function AutomationsPage() {
   const [activeTab, setActiveTab] = useState<'rules' | 'audit'>('rules');
 
   // Drawer & Modal State management
+  const queryClient = useQueryClient();
+  const [viewMode, setViewMode] = useState<'list' | 'library'>('list');
+  const [selectedTemplate, setSelectedTemplate] = useState<AutomationTemplate | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedRuleForEdit, setSelectedRuleForEdit] = useState<any | null>(null);
   
@@ -46,6 +52,9 @@ export default function AutomationsPage() {
       setIsDetailsOpen(false);
       setSelectedRuleForDetails(null);
       setActiveTab('rules');
+      setViewMode('list');
+      setSelectedTemplate(null);
+      setIsPreviewOpen(false);
     }
   }, [orgId]);
 
@@ -64,6 +73,38 @@ export default function AutomationsPage() {
     queryKey: ['automations', orgId],
     queryFn: () => automationsService.getAll(),
     enabled: !!orgId && canView && isEntitled && mounted,
+  });
+
+  // Query metadata for user listings inside preview modal
+  const metadataQuery = useQuery({
+    queryKey: ['automations', 'metadata', orgId],
+    queryFn: () => automationsService.getMetadata(),
+    enabled: isPreviewOpen && mounted,
+  });
+
+  // Fetch static library templates
+  const templatesQuery = useQuery<AutomationTemplate[]>({
+    queryKey: ['automations', 'templates'],
+    queryFn: () => automationsService.getTemplates(),
+    enabled: viewMode === 'library' && mounted,
+  });
+
+  // Instantiate template mutation
+  const instantiateMutation = useMutation({
+    mutationFn: ({ id, overrides }: { id: string; overrides: any }) =>
+      automationsService.instantiateTemplate(id, overrides),
+    onError: (err: any) => {
+      const errMsg = err.response?.data?.message || 'Failed to instantiate template';
+      const formattedMsg = Array.isArray(errMsg) ? errMsg[0] : errMsg;
+      toast.error(formattedMsg);
+    },
+    onSuccess: () => {
+      toast.success('Workflow created from template successfully');
+      queryClient.invalidateQueries({ queryKey: ['automations', orgId] });
+      setIsPreviewOpen(false);
+      setSelectedTemplate(null);
+      setViewMode('list');
+    },
   });
 
   // Display error toast if rulesQuery fails
@@ -164,73 +205,150 @@ export default function AutomationsPage() {
     setIsDetailsOpen(true);
   };
 
+  const handleSelectTemplate = (template: AutomationTemplate) => {
+    setSelectedTemplate(template);
+    setIsPreviewOpen(true);
+  };
+
+  const handleInstantiate = (overrides: any) => {
+    if (selectedTemplate) {
+      instantiateMutation.mutate({ id: selectedTemplate.id, overrides });
+    }
+  };
+
+  const handleCustomize = (prefilledState: any) => {
+    setIsPreviewOpen(false);
+    setSelectedTemplate(null);
+    setSelectedRuleForEdit({
+      id: '', // Empty ID represents new rule but prefilled
+      ...prefilledState,
+    });
+    setIsDrawerOpen(true);
+    setViewMode('list');
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
-            <span>Workflow Automations</span>
-          </h1>
-          <p className="text-muted-foreground mt-1.5">
-            Configure dynamic rules to assign tasks, notify operators, and send SMTPs on CRM event signals.
-          </p>
-        </div>
-        {canCreate && (
-          <button
-            onClick={handleCreateNew}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
-          >
-            <Plus className="h-4 w-4" />
-            <span>New Automation</span>
-          </button>
+        {viewMode === 'list' ? (
+          <>
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
+                <span>Workflow Automations</span>
+              </h1>
+              <p className="text-muted-foreground mt-1.5">
+                Configure dynamic rules to assign tasks, notify operators, and send SMTPs on CRM event signals.
+              </p>
+            </div>
+            {canCreate && (
+              <button
+                onClick={() => setViewMode('library')}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>New Automation</span>
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
+                <span>Templates Library</span>
+              </h1>
+              <p className="text-muted-foreground mt-1.5">
+                Select a workflow recipe to instantiate or customize in the builder.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setViewMode('list')}
+                className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-secondary transition-all cursor-pointer"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back to Rules</span>
+              </button>
+              {canCreate && (
+                <button
+                  onClick={handleCreateNew}
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold px-4 py-2.5 shadow-lg shadow-indigo-600/15 text-sm transition-all cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Start From Scratch</span>
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      {/* Tabs navigation */}
-      <div className="border-b border-border/80 flex gap-6 text-sm font-semibold select-none">
-        <button
-          onClick={() => setActiveTab('rules')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'rules'
-              ? 'border-indigo-500 text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Active Rules List
-        </button>
-        <button
-          onClick={() => setActiveTab('audit')}
-          className={`pb-3 border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'audit'
-              ? 'border-indigo-500 text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Runs History & Telemetry
-        </button>
-      </div>
+      {/* View Mode Switching */}
+      {viewMode === 'list' ? (
+        <>
+          {/* Tabs navigation */}
+          <div className="border-b border-border/80 flex gap-6 text-sm font-semibold select-none">
+            <button
+              onClick={() => setActiveTab('rules')}
+              className={`pb-3 border-b-2 transition-colors cursor-pointer ${
+                activeTab === 'rules'
+                  ? 'border-indigo-500 text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Active Rules List
+            </button>
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={`pb-3 border-b-2 transition-colors cursor-pointer ${
+                activeTab === 'audit'
+                  ? 'border-indigo-500 text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Runs History & Telemetry
+            </button>
+          </div>
 
-      {/* Tab Contents */}
-      {activeTab === 'rules' ? (
-        rulesQuery.isLoading ? (
-          <RulesListSkeleton />
+          {/* Tab Contents */}
+          {activeTab === 'rules' ? (
+            rulesQuery.isLoading ? (
+              <RulesListSkeleton />
+            ) : (
+              <RulesList
+                rules={rules}
+                onEdit={handleEdit}
+                onViewDetails={handleViewDetails}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                canCreate={canCreate}
+                orgId={orgId}
+              />
+            )
+          ) : (
+            <div className="space-y-8">
+              <StatsDashboard orgId={orgId} rules={rules} />
+              <ExecutionLogsTable orgId={orgId} rules={rules} />
+            </div>
+          )}
+        </>
+      ) : (
+        templatesQuery.isLoading ? (
+          <div className="flex h-[300px] items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+              <span className="text-xs text-muted-foreground font-semibold animate-pulse">
+                Loading templates library catalog...
+              </span>
+            </div>
+          </div>
         ) : (
-          <RulesList
-            rules={rules}
-            onEdit={handleEdit}
-            onViewDetails={handleViewDetails}
-            canUpdate={canUpdate}
-            canDelete={canDelete}
-            canCreate={canCreate}
-            orgId={orgId}
+          <TemplatesLibrary
+            templates={templatesQuery.data || []}
+            onSelectTemplate={handleSelectTemplate}
+            onClose={() => setViewMode('list')}
           />
         )
-      ) : (
-        <div className="space-y-8">
-          <StatsDashboard orgId={orgId} rules={rules} />
-          <ExecutionLogsTable orgId={orgId} rules={rules} />
-        </div>
       )}
 
       {/* Dynamic Creation/Edit Form Drawer */}
@@ -252,6 +370,20 @@ export default function AutomationsPage() {
           setSelectedRuleForDetails(null);
         }}
         rule={selectedRuleForDetails}
+      />
+
+      {/* Template Preview and Configuration Override Dialog */}
+      <TemplatePreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setSelectedTemplate(null);
+        }}
+        template={selectedTemplate}
+        organizationUsers={metadataQuery.data?.organizationUsers || []}
+        onInstantiate={handleInstantiate}
+        onCustomize={handleCustomize}
+        isPending={instantiateMutation.isPending}
       />
     </div>
   );

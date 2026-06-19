@@ -38,7 +38,7 @@ export default function AutomationDrawer({
   orgId,
 }: AutomationDrawerProps) {
   const queryClient = useQueryClient();
-  const isEditMode = !!rule;
+  const isEditMode = !!(rule && rule.id);
 
   // Form local states
   const [name, setName] = useState('');
