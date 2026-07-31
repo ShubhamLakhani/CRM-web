@@ -10,11 +10,14 @@ const TEMPLATE_VARIABLES: VariableItem[] = [
   { key: '{{contact.name}}', description: 'Contact Full Name' },
   { key: '{{contact.email}}', description: 'Contact Email Address' },
   { key: '{{contact.status}}', description: 'Contact Lifecycle Status' },
+  { key: '{{before.contact.status}}', description: 'Previous Contact Status' },
   { key: '{{deal.title}}', description: 'Pipeline Deal Title' },
   { key: '{{deal.value}}', description: 'Pipeline Deal Value ($)' },
   { key: '{{deal.stage}}', description: 'Pipeline Deal Stage' },
+  { key: '{{before.deal.stage}}', description: 'Previous Deal Stage' },
   { key: '{{task.title}}', description: 'Action Task Title' },
   { key: '{{task.status}}', description: 'Action Task Status' },
+  { key: '{{before.task.status}}', description: 'Previous Task Status' },
 ];
 
 export default function TemplateHelperPanel() {

@@ -22,10 +22,5 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     setMounted(true);
   }, [setTheme]);
 
-  // Prevent flash by avoiding rendering until theme is safely set
-  if (!mounted) {
-    return <div className="min-h-screen bg-[#0b0f19]" />;
-  }
-
   return <>{children}</>;
 }

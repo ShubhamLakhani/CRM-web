@@ -436,6 +436,10 @@ export const automationsService = {
     const res = await apiClient.get('/automations/executions', { params });
     return res.data;
   },
+  getExecutionTelemetry: async (id: string) => {
+    const res = await apiClient.get(`/automations/executions/${id}/telemetry`);
+    return res.data;
+  },
   getStats: async (ruleId?: string) => {
     const res = await apiClient.get('/automations/stats', { params: { ruleId } });
     return res.data;

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -7,7 +8,7 @@ import { automationsService, subscriptionService } from '@/services/api';
 import { useAuth } from '@/providers/AuthProvider';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from '@/store/toastStore';
-import RulesList from '@/components/automations/RulesList';
+import RulesList, { Rule } from '@/components/automations/RulesList';
 import RuleDetailsDrawer from '@/components/automations/RuleDetailsDrawer';
 import AutomationDrawer from '@/components/automations/AutomationDrawer';
 import StatsDashboard from '@/components/automations/StatsDashboard';
@@ -15,6 +16,7 @@ import ExecutionLogsTable from '@/components/automations/ExecutionLogsTable';
 import RulesListSkeleton from '@/components/automations/RulesListSkeleton';
 import TemplatesLibrary, { AutomationTemplate } from '@/components/automations/TemplatesLibrary';
 import TemplatePreviewModal from '@/components/automations/TemplatePreviewModal';
+import ExecutionDetailsModal from '@/components/automations/ExecutionDetailsModal';
 
 export default function AutomationsPage() {
   const { user } = useAuth();
@@ -35,10 +37,20 @@ export default function AutomationsPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<AutomationTemplate | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [selectedRuleForEdit, setSelectedRuleForEdit] = useState<any | null>(null);
+  const [selectedRuleForEdit, setSelectedRuleForEdit] = useState<Rule | null>(null);
   
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  const [selectedRuleForDetails, setSelectedRuleForDetails] = useState<any | null>(null);
+  const [selectedRuleForDetails, setSelectedRuleForDetails] = useState<Rule | null>(null);
+
+  const [isTelemetryOpen, setIsTelemetryOpen] = useState(false);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
+
+  // Sorting & Filtering State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [healthFilter, setHealthFilter] = useState<'ALL' | 'HEALTHY' | 'WARNING' | 'CRITICAL' | 'UNKNOWN'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ENABLED' | 'DISABLED'>('ALL');
+  const [sortBy, setSortBy] = useState<'name' | 'health' | 'duration' | 'created'>('created');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     setMounted(true);
@@ -51,6 +63,8 @@ export default function AutomationsPage() {
       setSelectedRuleForEdit(null);
       setIsDetailsOpen(false);
       setSelectedRuleForDetails(null);
+      setIsTelemetryOpen(false);
+      setSelectedExecutionId(null);
       setActiveTab('rules');
       setViewMode('list');
       setSelectedTemplate(null);
@@ -69,7 +83,7 @@ export default function AutomationsPage() {
   const isEntitled = !!subscriptionQuery.data?.plan?.automation;
 
   // Query Rules List
-  const rulesQuery = useQuery<any[]>({
+  const rulesQuery = useQuery<Rule[]>({
     queryKey: ['automations', orgId],
     queryFn: () => automationsService.getAll(),
     enabled: !!orgId && canView && isEntitled && mounted,
@@ -91,9 +105,9 @@ export default function AutomationsPage() {
 
   // Instantiate template mutation
   const instantiateMutation = useMutation({
-    mutationFn: ({ id, overrides }: { id: string; overrides: any }) =>
+    mutationFn: ({ id, overrides }: { id: string; overrides: Record<string, unknown> }) =>
       automationsService.instantiateTemplate(id, overrides),
-    onError: (err: any) => {
+    onError: (err: { response?: { data?: { message?: string | string[] } } }) => {
       const errMsg = err.response?.data?.message || 'Failed to instantiate template';
       const formattedMsg = Array.isArray(errMsg) ? errMsg[0] : errMsg;
       toast.error(formattedMsg);
@@ -116,6 +130,95 @@ export default function AutomationsPage() {
   }, [rulesQuery.isError, rulesQuery.error]);
 
   const rules = useMemo(() => rulesQuery.data || [], [rulesQuery.data]);
+
+  // Query Rules Stats
+  const statsQuery = useQuery({
+    queryKey: ['automations', 'stats', orgId],
+    queryFn: () => automationsService.getStats(),
+    enabled: !!orgId && canView && isEntitled && mounted,
+  });
+
+  const ruleStatsMap = useMemo(() => {
+    const map: Record<string, Record<string, unknown>> = {};
+    if (statsQuery.data?.rules) {
+      statsQuery.data.rules.forEach((r: { ruleId: string; [key: string]: unknown }) => {
+        map[r.ruleId] = r;
+      });
+    }
+    return map;
+  }, [statsQuery.data]);
+
+  const enrichedRules = useMemo<Rule[]>(() => {
+    const list = rulesQuery.data || [];
+    return list.map((rule: Rule) => ({
+      ...rule,
+      stats: (ruleStatsMap[rule.id] as any) || {
+        totalRuns: 0,
+        successCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        successRate: 100.0,
+        averageDurationMs: 0,
+        lastRunAt: null,
+        lastSuccessAt: null,
+        lastFailureAt: null,
+        health: 'UNKNOWN',
+      },
+    }));
+  }, [rulesQuery.data, ruleStatsMap]);
+
+  const processedRules = useMemo(() => {
+    let list = [...enrichedRules];
+
+    // 1. Text Search Filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          (r.description && r.description.toLowerCase().includes(q))
+      );
+    }
+
+    // 2. Health status filter
+    if (healthFilter !== 'ALL') {
+      list = list.filter((r) => r.stats?.health === healthFilter);
+    }
+
+    // 3. Enabled/Disabled filter
+    if (statusFilter !== 'ALL') {
+      const wantEnabled = statusFilter === 'ENABLED';
+      list = list.filter((r) => r.isEnabled === wantEnabled);
+    }
+
+    // 4. Sort
+    list.sort((a, b) => {
+      let valA: string | number = '';
+      let valB: string | number = '';
+
+      if (sortBy === 'name') {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (sortBy === 'health') {
+        const healthRank = { CRITICAL: 0, WARNING: 1, HEALTHY: 2, UNKNOWN: 3 };
+        valA = healthRank[a.stats?.health as keyof typeof healthRank] ?? 3;
+        valB = healthRank[b.stats?.health as keyof typeof healthRank] ?? 3;
+      } else if (sortBy === 'duration') {
+        valA = a.stats?.averageDurationMs || 0;
+        valB = b.stats?.averageDurationMs || 0;
+      } else {
+        // created
+        valA = new Date(a.createdAt).getTime();
+        valB = new Date(b.createdAt).getTime();
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [enrichedRules, searchQuery, healthFilter, statusFilter, sortBy, sortOrder]);
 
   // Loading indicator for mounting or initial subscription check
   if (!mounted || subscriptionQuery.isLoading) {
@@ -190,7 +293,7 @@ export default function AutomationsPage() {
     );
   }
 
-  const handleEdit = (rule: any) => {
+  const handleEdit = (rule: Rule) => {
     setSelectedRuleForEdit(rule);
     setIsDrawerOpen(true);
   };
@@ -200,7 +303,7 @@ export default function AutomationsPage() {
     setIsDrawerOpen(true);
   };
 
-  const handleViewDetails = (rule: any) => {
+  const handleViewDetails = (rule: Rule) => {
     setSelectedRuleForDetails(rule);
     setIsDetailsOpen(true);
   };
@@ -210,19 +313,19 @@ export default function AutomationsPage() {
     setIsPreviewOpen(true);
   };
 
-  const handleInstantiate = (overrides: any) => {
+  const handleInstantiate = (overrides: Record<string, unknown>) => {
     if (selectedTemplate) {
       instantiateMutation.mutate({ id: selectedTemplate.id, overrides });
     }
   };
 
-  const handleCustomize = (prefilledState: any) => {
+  const handleCustomize = (prefilledState: Record<string, unknown>) => {
     setIsPreviewOpen(false);
     setSelectedTemplate(null);
     setSelectedRuleForEdit({
       id: '', // Empty ID represents new rule but prefilled
       ...prefilledState,
-    });
+    } as any);
     setIsDrawerOpen(true);
     setViewMode('list');
   };
@@ -315,20 +418,99 @@ export default function AutomationsPage() {
             rulesQuery.isLoading ? (
               <RulesListSkeleton />
             ) : (
-              <RulesList
-                rules={rules}
-                onEdit={handleEdit}
-                onViewDetails={handleViewDetails}
-                canUpdate={canUpdate}
-                canDelete={canDelete}
-                canCreate={canCreate}
-                orgId={orgId}
-              />
+              <div className="space-y-6">
+                {/* Search, Sort, Filter Controls */}
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card/60 backdrop-blur-sm border border-border p-4 rounded-2xl">
+                  {/* Search Bar */}
+                  <div className="relative w-full md:w-80">
+                    <input
+                      type="text"
+                      placeholder="Search rules..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-secondary/20 py-2.5 px-3 text-xs text-foreground placeholder-muted-foreground outline-none focus:border-indigo-500/50"
+                    />
+                  </div>
+
+                  {/* Filters */}
+                  <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                    {/* Status filter */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</span>
+                      <select
+                        value={statusFilter}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value as 'ALL' | 'ENABLED' | 'DISABLED')}
+                        className="rounded-xl border border-border bg-card py-2 px-3 text-xs text-foreground outline-none focus:border-indigo-500/50 cursor-pointer font-semibold"
+                      >
+                        <option value="ALL">All Status</option>
+                        <option value="ENABLED">Enabled</option>
+                        <option value="DISABLED">Disabled</option>
+                      </select>
+                    </div>
+
+                    {/* Health Filter */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Health</span>
+                      <select
+                        value={healthFilter}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setHealthFilter(e.target.value as 'ALL' | 'HEALTHY' | 'WARNING' | 'CRITICAL' | 'UNKNOWN')}
+                        className="rounded-xl border border-border bg-card py-2 px-3 text-xs text-foreground outline-none focus:border-indigo-500/50 cursor-pointer font-semibold"
+                      >
+                        <option value="ALL">All Health</option>
+                        <option value="HEALTHY">Healthy</option>
+                        <option value="WARNING">Warning</option>
+                        <option value="CRITICAL">Critical</option>
+                        <option value="UNKNOWN">Unknown</option>
+                      </select>
+                    </div>
+
+                    {/* Sort By */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Sort By</span>
+                      <select
+                        value={sortBy}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value as 'name' | 'health' | 'duration' | 'created')}
+                        className="rounded-xl border border-border bg-card py-2 px-3 text-xs text-foreground outline-none focus:border-indigo-500/50 cursor-pointer font-semibold"
+                      >
+                        <option value="created">Date Created</option>
+                        <option value="name">Name</option>
+                        <option value="health">Health State</option>
+                        <option value="duration">Execution Duration</option>
+                      </select>
+                    </div>
+
+                    {/* Sort Order Toggle */}
+                    <button
+                      onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+                      className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-foreground hover:bg-secondary transition-all cursor-pointer"
+                    >
+                      {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
+                    </button>
+                  </div>
+                </div>
+
+                <RulesList
+                  rules={processedRules}
+                  onEdit={handleEdit}
+                  onViewDetails={handleViewDetails}
+                  canUpdate={canUpdate}
+                  canDelete={canDelete}
+                  canCreate={canCreate}
+                  orgId={orgId}
+                />
+              </div>
             )
           ) : (
             <div className="space-y-8">
               <StatsDashboard orgId={orgId} rules={rules} />
-              <ExecutionLogsTable orgId={orgId} rules={rules} />
+              <ExecutionLogsTable 
+                orgId={orgId} 
+                rules={rules} 
+                onViewTelemetry={(id) => {
+                  setSelectedExecutionId(id);
+                  setIsTelemetryOpen(true);
+                }}
+              />
             </div>
           )}
         </>
@@ -384,6 +566,16 @@ export default function AutomationsPage() {
         onInstantiate={handleInstantiate}
         onCustomize={handleCustomize}
         isPending={instantiateMutation.isPending}
+      />
+
+      {/* Execution details telemetry trace modal */}
+      <ExecutionDetailsModal
+        isOpen={isTelemetryOpen}
+        onClose={() => {
+          setIsTelemetryOpen(false);
+          setSelectedExecutionId(null);
+        }}
+        executionId={selectedExecutionId}
       />
     </div>
   );

@@ -12,12 +12,13 @@ interface Rule {
 interface ExecutionLogsTableProps {
   orgId: string;
   rules: Rule[];
+  onViewTelemetry: (id: string) => void;
 }
 
-export default function ExecutionLogsTable({ orgId, rules }: ExecutionLogsTableProps) {
+export default function ExecutionLogsTable({ orgId, rules, onViewTelemetry }: ExecutionLogsTableProps) {
   // Query Filters
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit] = useState(10);
   const [statusFilter, setStatusFilter] = useState('');
   const [ruleFilter, setRuleFilter] = useState('');
 
@@ -146,12 +147,24 @@ export default function ExecutionLogsTable({ orgId, rules }: ExecutionLogsTableP
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4">Trigger Time</th>
                   <th className="px-6 py-4">Details</th>
+                  <th className="px-6 py-4 text-right">Telemetry</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border text-sm text-foreground">
-                {logs.map((log: any) => (
+                {logs.map((log: {
+                  id: string;
+                  automationExecutionId: string;
+                  rule?: { name: string } | null;
+                  triggerEvent: string;
+                  status: string;
+                  startedAt: string;
+                  errorMessage?: string | null;
+                }) => (
                   <tr key={log.id} className="hover:bg-muted/5 transition-colors duration-150">
-                    <td className="px-6 py-4 font-mono text-xs text-indigo-400 select-all max-w-[150px] truncate">
+                    <td 
+                      onClick={() => onViewTelemetry(log.id)}
+                      className="px-6 py-4 font-mono text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer select-all max-w-[150px] truncate hover:underline"
+                    >
                       {log.automationExecutionId}
                     </td>
                     <td className="px-6 py-4 font-semibold text-foreground">
@@ -186,6 +199,14 @@ export default function ExecutionLogsTable({ orgId, rules }: ExecutionLogsTableP
                       ) : (
                         'Execution active.'
                       )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => onViewTelemetry(log.id)}
+                        className="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                      >
+                        View Trace
+                      </button>
                     </td>
                   </tr>
                 ))}

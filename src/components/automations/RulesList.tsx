@@ -1,28 +1,42 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import React from 'react';
-import { Copy, Edit3, Trash2, Zap, ZapOff, Check, X, MoreVertical, Eye, Play } from 'lucide-react';
+import { Copy, Edit3, Trash2, ZapOff, MoreVertical, Eye, Play } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { automationsService } from '@/services/api';
 import { toast } from '@/store/toastStore';
 import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 
-interface Action {
+export interface Action {
   id: string;
   actionType: string;
-  configurationJson: Record<string, any>;
+  configurationJson: Record<string, unknown>;
 }
 
-interface Rule {
+export interface Rule {
   id: string;
   name: string;
   description: string | null;
   triggerEvent: string;
-  conditionsJson: any;
+  conditionsJson: unknown;
   isEnabled: boolean;
   version: number;
   failureCount: number;
   lastFailureAt: string | null;
   actions: Action[];
+  createdAt: string;
+  stats?: {
+    totalRuns: number;
+    successCount: number;
+    failedCount: number;
+    skippedCount: number;
+    successRate: number;
+    averageDurationMs: number;
+    lastRunAt: string | null;
+    lastSuccessAt: string | null;
+    lastFailureAt: string | null;
+    health: 'HEALTHY' | 'WARNING' | 'CRITICAL' | 'UNKNOWN';
+  };
 }
 
 interface RulesListProps {
@@ -105,19 +119,55 @@ export default function RulesList({
     }
   }, [activeMenuId]);
 
-  // Formatting date helper
-  const formatDate = (dateStr: string | null) => {
+
+
+  const renderHealthBadge = (health: 'HEALTHY' | 'WARNING' | 'CRITICAL' | 'UNKNOWN' | undefined) => {
+    const status = health || 'UNKNOWN';
+    let badgeClass = '';
+    switch (status) {
+      case 'HEALTHY':
+        badgeClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15';
+        break;
+      case 'WARNING':
+        badgeClass = 'bg-amber-500/10 text-amber-400 border border-amber-500/15';
+        break;
+      case 'CRITICAL':
+        badgeClass = 'bg-rose-500/10 text-rose-400 border border-rose-500/15';
+        break;
+      default:
+        badgeClass = 'bg-slate-500/10 text-muted-foreground border border-border';
+    }
+
+    return (
+      <span className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[9px] font-extrabold tracking-wide uppercase ${badgeClass}`}>
+        {status}
+      </span>
+    );
+  };
+
+  const formatLastRun = (dateStr: string | null | undefined) => {
     if (!dateStr) return '—';
     try {
       const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins < 1) return 'just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 7) return `${diffDays}d ago`;
+
       return date.toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
       });
-    } catch (e) {
-      return dateStr;
+    } catch {
+      return '—';
     }
   };
 
@@ -134,7 +184,11 @@ export default function RulesList({
       });
       return { previousRules };
     },
-    onError: (err: any, variables, context) => {
+    onError: (
+      err: { response?: { data?: { message?: string | string[] } } }, 
+      variables: { id: string; isEnabled: boolean }, 
+      context: { previousRules?: Rule[] } | undefined
+    ) => {
       queryClient.setQueryData(['automations', orgId], context?.previousRules);
       const errMsg = err.response?.data?.message;
       const formattedMsg = Array.isArray(errMsg) ? errMsg[0] : errMsg || 'Failed to change automation status';
@@ -160,7 +214,11 @@ export default function RulesList({
       });
       return { previousRules };
     },
-    onError: (err: any, id, context) => {
+    onError: (
+      err: { response?: { data?: { message?: string | string[] } } }, 
+      id: string, 
+      context: { previousRules?: Rule[] } | undefined
+    ) => {
       queryClient.setQueryData(['automations', orgId], context?.previousRules);
       const errMsg = err.response?.data?.message;
       const formattedMsg = Array.isArray(errMsg) ? errMsg[0] : errMsg || 'Failed to delete automation';
@@ -176,8 +234,8 @@ export default function RulesList({
 
   // Duplicate Mutation
   const duplicateMutation = useMutation({
-    mutationFn: (newRule: any) => automationsService.create(newRule),
-    onError: (err: any) => {
+    mutationFn: (newRule: Omit<Rule, 'id' | 'version' | 'failureCount' | 'lastFailureAt' | 'createdAt' | 'actions'> & { actions: Omit<Action, 'id'>[] }) => automationsService.create(newRule),
+    onError: (err: { response?: { data?: { message?: string | string[] } } }) => {
       const errMsg = err.response?.data?.message;
       const formattedMsg = Array.isArray(errMsg) ? errMsg[0] : errMsg || 'Failed to duplicate automation';
       toast.error(formattedMsg);
@@ -204,7 +262,7 @@ export default function RulesList({
     if (!canCreate) return;
     const duplicatedPayload = {
       name: `${rule.name} (Copy)`,
-      description: rule.description || undefined,
+      description: rule.description || null,
       triggerEvent: rule.triggerEvent,
       conditionsJson: rule.conditionsJson,
       isEnabled: rule.isEnabled,
@@ -245,9 +303,10 @@ export default function RulesList({
               <th className="px-6 py-4">Rule Name</th>
               <th className="px-6 py-4">Trigger</th>
               <th className="px-6 py-4">Active Actions</th>
-              <th className="px-6 py-4">Version</th>
-              <th className="px-6 py-4">Failures</th>
-              <th className="px-6 py-4">Last Failure</th>
+              <th className="px-6 py-4">Health</th>
+              <th className="px-6 py-4">Success Rate</th>
+              <th className="px-6 py-4">Avg Duration</th>
+              <th className="px-6 py-4">Last Run</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4 text-right">Actions</th>
             </tr>
@@ -282,22 +341,17 @@ export default function RulesList({
                     {rule.actions.length} action{rule.actions.length !== 1 ? 's' : ''}
                   </span>
                 </td>
-                <td className="px-6 py-4 font-mono font-semibold text-xs">
-                  v{rule.version}
-                </td>
                 <td className="px-6 py-4">
-                  <span
-                    className={`font-mono text-xs font-bold px-1.5 py-0.2 rounded ${
-                      rule.failureCount > 0
-                        ? 'text-rose-400 bg-rose-500/10 border border-rose-500/15'
-                        : 'text-muted-foreground'
-                    }`}
-                  >
-                    {rule.failureCount}
-                  </span>
+                  {renderHealthBadge(rule.stats?.health)}
+                </td>
+                <td className="px-6 py-4 font-mono font-bold text-xs">
+                  {rule.stats !== undefined ? `${rule.stats.successRate}%` : '100%'}
+                </td>
+                <td className="px-6 py-4 font-mono font-bold text-xs text-muted-foreground">
+                  {rule.stats?.averageDurationMs !== undefined ? `${rule.stats.averageDurationMs}ms` : '—'}
                 </td>
                 <td className="px-6 py-4 text-xs font-semibold text-muted-foreground">
-                  {formatDate(rule.lastFailureAt)}
+                  {formatLastRun(rule.stats?.lastRunAt)}
                 </td>
                 <td className="px-6 py-4">
                   <button

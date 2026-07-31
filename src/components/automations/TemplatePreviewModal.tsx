@@ -50,11 +50,15 @@ export default function TemplatePreviewModal({
   // Compile visual steps
   const getFriendlyTrigger = (trigger: string) => {
     if (trigger === 'CONTACT_CREATED') return 'Contact is created';
+    if (trigger === 'CONTACT_UPDATED') return 'Contact is updated';
     if (trigger === 'DEAL_CREATED') return 'Deal is created';
+    if (trigger === 'DEAL_UPDATED') return 'Deal is updated';
     if (trigger === 'DEAL_STAGE_CHANGED') return 'Deal stage changes';
     if (trigger === 'DEAL_WON') return 'Deal is marked won';
     if (trigger === 'TASK_COMPLETED') return 'Task is completed';
+    if (trigger === 'TASK_UPDATED') return 'Task is updated';
     if (trigger === 'USER_INVITED') return 'User invite is sent';
+    if (trigger === 'COMPANY_UPDATED') return 'Company is updated';
     return trigger;
   };
 
