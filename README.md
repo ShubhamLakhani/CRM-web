@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Apex CRM Frontend - Client Web Portal 🎨
 
-## Getting Started
+This is the Next.js frontend client application for **Apex CRM**. It provides sales reps, operational managers, and owners with a highly-interactive, responsive UI featuring smooth transitions, real-time dashboard updates, and robust command palette controls.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🛠️ Technology Stack
+
+* **Framework**: [Next.js 15.0](https://nextjs.org/) (App Router, React 19)
+* **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) & Vanilla CSS variables
+* **Data Fetching & Cache**: [TanStack Query v5](https://tanstack.com/query/latest) (React Query)
+* **HTTP Client**: [Axios](https://axios-http.com/)
+* **State Management**: [Zustand](https://github.com/pmndrs/zustand) (toast messaging, user preference overrides)
+* **Icons**: [Lucide React](https://lucide.dev/)
+
+---
+
+## 📁 Workspace Directory Structure
+
+```
+apps/web/
+├── public/                 # Static assets & public images
+└── src/
+    ├── app/                # Next.js App Router (Layouts & Pages)
+    │   ├── (auth)/         # Login page & signup workflows
+    │   ├── (dashboard)/    # Scoped application sections
+    │   │   ├── activity/   # Workspace interaction logs & timelines
+    │   │   ├── automations/# Visual Rule/Action builder interfaces
+    │   │   ├── contacts/   # CRM contacts and company profiling
+    │   │   ├── deals/      # Drag-and-drop Sales Pipeline Kanban board
+    │   │   ├── settings/   # Organization memberships and billing limits
+    │   │   └── tasks/      # Collaborative task delegator table
+    │   └── globals.css     # Tailwind imports and root CSS variables
+    │
+    ├── components/         # Shared & interactive dashboard components
+    │   ├── ui/             # Core UI blocks (Buttons, Inputs, Dialogs)
+    │   ├── Sidebar.tsx     # Navigation and Workspace Switcher dropdown
+    │   ├── KanbanBoard.tsx # Pipeline opportunity cards
+    │   └── CommandPalette.tsx # Keyboard-triggered shortcut window
+    │
+    ├── providers/          # Context wrapper packages (Query, Session Auth)
+    └── store/              # Zustand global storage logic for notification states
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ⚡ Key Frontend Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Workspace Switcher Dropdown**: Integrates with organizational membership tables. Updates context references and retrieves active tenant profiles dynamically.
+2. **Deals Kanban Pipeline**: Drag-and-drop opportunity cards with state-transition listeners. Automatically triggers background automation pipelines on stage moves.
+3. **No-Code Automation Builder**: Queries `/api/automations/metadata` to dynamically populate condition options, numeric parameters, state triggers, and custom actions inside rule panels.
+4. **Keyboard Command Palette**: Press `Cmd+K` (or `Ctrl+K`) to open a global command modal, enabling quick navigation, workspace searches, and entity creation.
+5. **Real-time Notifications**: Custom Zustand-based toaster alerts showing execution summaries and system updates.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## ⚙️ Local Configuration
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+To run the frontend individually:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 1. Set Environment Variables
+Create a `.env.local` file containing the URL of the API gateway (refer to `.env.example`):
+```env
+NEXT_PUBLIC_API_URL="http://localhost:8006/api"
+```
 
-## Deploy on Vercel
+### 2. Available Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+From this directory (`apps/web/`):
+```bash
+# Start the local development server on port 3000
+npm run dev
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Build the production bundle
+npm run build
+
+# Start the Next.js server with the production build
+npm run start
+
+# Run ESLint validation
+npm run lint
+```
+
+---
+
+## 💡 Monorepo Setup Note
+For database integration, background workers, and REST services, refer to the main [Workspace Root README](../../README.md) for docker, seeding, and migration setups.
